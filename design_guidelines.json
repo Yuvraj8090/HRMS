@@ -1,0 +1,163 @@
+{
+  "design_system": {
+    "identity": {
+      "name": "Nexus HR",
+      "archetype": "The Performance Pro",
+      "vibe": "International, Precise, Human-Centric",
+      "principles": [
+        "Data Density with Breathing Room",
+        "Context-Aware Navigation",
+        "Visual Hierarchy via Contrast, not Color",
+        "Motion as Feedback, not Decoration"
+      ]
+    },
+    "typography": {
+      "headings": {
+        "family": "Manrope, sans-serif",
+        "weights": ["600", "700", "800"],
+        "usage": "Use for all page titles, card headers, and modal titles. Tracking tight (-0.02em)."
+      },
+      "body": {
+        "family": "Public Sans, sans-serif",
+        "weights": ["400", "500"],
+        "usage": "Use for all standard text, table data, and form inputs. Excellent legibility at small sizes."
+      },
+      "mono": {
+        "family": "JetBrains Mono, monospace",
+        "usage": "Use for Employee IDs, Transaction Codes, and API keys."
+      },
+      "scale": {
+        "h1": "text-4xl font-bold tracking-tight lg:text-5xl",
+        "h2": "text-3xl font-semibold tracking-tight",
+        "h3": "text-2xl font-semibold tracking-tight",
+        "p": "text-base leading-7 text-muted-foreground",
+        "small": "text-sm font-medium leading-none"
+      }
+    },
+    "colors": {
+      "primary": {
+        "name": "International Indigo",
+        "hex": "#4338ca",
+        "tailwind": "indigo-700",
+        "usage": "Primary actions, active states, key data points."
+      },
+      "secondary": {
+        "name": "Slate Neutral",
+        "hex": "#f1f5f9",
+        "tailwind": "slate-100",
+        "usage": "Backgrounds, secondary buttons, borders."
+      },
+      "accent": {
+        "success": "#10b981",
+        "warning": "#f59e0b",
+        "error": "#ef4444",
+        "info": "#3b82f6"
+      },
+      "background": {
+        "light": "#ffffff",
+        "dark": "#0f172a",
+        "subtle": "#f8fafc"
+      }
+    },
+    "layout": {
+      "grid_system": "Bento Grid Mode B (High Density)",
+      "spacing": {
+        "container_padding": "p-6 md:p-8 lg:p-10",
+        "element_gap": "gap-4 md:gap-6",
+        "section_gap": "gap-8 md:gap-12"
+      },
+      "radius": {
+        "default": "rounded-md",
+        "card": "rounded-lg",
+        "button": "rounded-md"
+      },
+      "shadows": {
+        "card": "shadow-sm hover:shadow-md transition-shadow duration-200",
+        "dropdown": "shadow-lg border border-slate-200 dark:border-slate-800"
+      }
+    },
+    "components": {
+      "buttons": {
+        "primary": "bg-indigo-700 hover:bg-indigo-800 text-white shadow-sm",
+        "secondary": "bg-white text-slate-900 border border-slate-200 hover:bg-slate-50 shadow-sm",
+        "ghost": "hover:bg-slate-100 hover:text-slate-900"
+      },
+      "cards": {
+        "style": "bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 shadow-sm",
+        "header": "p-6 pb-3 border-b border-slate-100 dark:border-slate-900",
+        "content": "p-6 pt-3"
+      },
+      "inputs": {
+        "style": "h-10 rounded-md border border-slate-300 bg-transparent px-3 py-2 text-sm placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-600 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+      },
+      "tables": {
+        "style": "w-full caption-bottom text-sm",
+        "header": "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted",
+        "row": "border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+      }
+    },
+    "visual_enhancers": {
+      "glassmorphism": "backdrop-blur-md bg-white/70 dark:bg-slate-950/70 border border-white/20 shadow-sm",
+      "gradients": "None. Use solid colors for professional clarity.",
+      "textures": "Subtle noise overlay on dashboard backgrounds (opacity 0.02) to reduce sterility."
+    },
+    "assets": {
+      "icons": "Lucide React (Stroke width 1.5px for elegance)",
+      "images": {
+        "login_background": {
+          "url": "https://images.unsplash.com/photo-1765366417030-16d9765d920a?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "alt": "Modern minimalist office space",
+          "usage": "Full screen background for login page with 50% black overlay"
+        },
+        "dashboard_hero": {
+          "url": "https://images.unsplash.com/photo-1745970347652-8f22f5d7d3ba?crop=entropy&cs=srgb&fm=jpg&q=85",
+          "alt": "Corporate reception area",
+          "usage": "Header background or welcome widget"
+        },
+        "avatars": [
+          {
+            "url": "https://images.unsplash.com/photo-1712174766230-cb7304feaafe?crop=entropy&cs=srgb&fm=jpg&q=85",
+            "alt": "Professional woman portrait"
+          },
+          {
+            "url": "https://images.unsplash.com/photo-1659353220597-71b8c6a56259?crop=entropy&cs=srgb&fm=jpg&q=85",
+            "alt": "Professional man in suit"
+          }
+        ]
+      }
+    }
+  },
+  "implementation_guide": {
+    "file_structure": {
+      "pages": "/app/frontend/src/pages",
+      "components": "/app/frontend/src/components",
+      "ui_lib": "/app/frontend/src/components/ui",
+      "layouts": "/app/frontend/src/layouts"
+    },
+    "tech_stack": {
+      "framework": "React (JS)",
+      "styling": "Tailwind CSS",
+      "ui_library": "Shadcn UI",
+      "icons": "lucide-react",
+      "charts": "recharts"
+    },
+    "instructions": [
+      "Use 'Manrope' for all headings and 'Public Sans' for body text. Import via Google Fonts in index.css.",
+      "Implement a 'Layout' component that handles the Sidebar and Topbar structure.",
+      "Use the 'Bento Grid' philosophy for the Dashboard: Mix 1x1, 2x1, and 2x2 widgets.",
+      "Ensure all forms use 'react-hook-form' and 'zod' for validation.",
+      "Use 'recharts' for analytics. Style them to match the 'International Indigo' palette.",
+      "For the Employee Table, use a data-table component with pagination, filtering, and sorting.",
+      "Login page must be split 50/50 or centered card on the 'login_background' image."
+    ]
+  },
+  "universal_guidelines": [
+    "DO NOT use gradients for backgrounds. Keep it flat and clean.",
+    "DO NOT center text in cards unless it is a specific 'stat' widget.",
+    "ALWAYS use 'gap-4' or 'gap-6' in flex/grid containers. Avoid 'margin' hacks.",
+    "Interactive elements must have a ':hover' state defined.",
+    "Use 'text-muted-foreground' for secondary text (labels, descriptions).",
+    "Borders should be subtle: 'border-slate-200' in light mode.",
+    "Add 'data-testid' to all buttons, inputs, and links for testing."
+  ]
+}
