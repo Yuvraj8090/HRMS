@@ -1,0 +1,24 @@
+# Dependency directories
+**/node_modules/
+dist/
+build/
+
+# Environment variables (CRITICAL)
+**/.env
+**/.env.local
+**/.env.development.local
+**/.env.test.local
+**/.env.production.local
+
+# Debug logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+logs
+*.log
+
+# Editor/OS specific
+.DS_Store
+.vscode/
+.idea/
+Thumbs.db
