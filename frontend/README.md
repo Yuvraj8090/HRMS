@@ -1,70 +1,109 @@
-# Getting Started with Create React App
+# HRMS Frontend
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Clean, production-ready React 18 + Vite frontend for the HRMS system.
+No Tailwind build complexity — pure CSS with design tokens.
 
-## Available Scripts
+## Quick Start
 
-In the project directory, you can run:
+```bash
+# 1. Install
+npm install
 
-### `npm start`
+# 2. Configure API URL (copy .env.example → .env)
+cp .env.example .env
+# Edit VITE_API_URL if your backend runs on a different port
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+# 3. Run
+npm run dev        # → http://localhost:3000
+```
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+> The Vite proxy automatically forwards `/api/*` to `http://localhost:5000`
+> so you don't need CORS issues during development.
 
-### `npm test`
+## Demo Login Credentials
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+| Role     | Email                   | Password      |
+|----------|-------------------------|---------------|
+| Admin    | admin@hrms.local        | Admin@123456  |
+| HR       | hr@hrms.local           | Hr@123456     |
+| Employee | employee@hrms.local     | Emp@123456    |
 
-### `npm run build`
+Click the role buttons on the login screen to auto-fill.
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+## Pages by Role
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Employee
+- **Dashboard** — Live clock, attendance widget, project grid, increment request modal
+- **My Attendance** — Full clock-in/out history with date filters
+- **My Projects** — Projects assigned to you
+- **My Requests** — Increment request history and status
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+### HR
+- **Dashboard** — KPI cards, pending requests preview, today's attendance
+- **Employees** — Full directory with search + department filter
+- **Projects** — Create/edit/archive projects
+- **Requests** — Review & approve/reject increment requests with salary input
+- **Attendance** — Live overview of all employee check-ins
 
-### `npm run eject`
+### Admin
+- **Dashboard** — System-wide KPIs, recent employees, pending requests
+- **Employees** — Full employee directory
+- **Projects** — Full project management
+- **Requests** — Approve/reject all request types
+- **Attendance** — Daily overview
+- **Departments** — Create/edit/archive departments
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+## File Structure
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```
+src/
+├── index.css                  ← All design tokens + utility CSS
+├── main.jsx                   ← Entry point
+├── App.jsx                    ← Router + all pages wired per role
+├── context/
+│   ├── AuthContext.jsx         ← JWT auth state, role helpers
+│   └── ToastContext.jsx        ← Global toast notifications
+├── services/
+│   └── api.js                 ← Axios + JWT interceptor + all API methods
+├── components/
+│   ├── common/index.jsx       ← Icon, Badge, Modal, Spinner, StatCard, etc.
+│   └── layout/
+│       ├── AppLayout.jsx      ← Main layout wrapper
+│       └── Sidebar.jsx        ← Role-based navigation sidebar
+└── pages/
+    ├── auth/LoginPage.jsx
+    ├── employee/
+    │   ├── EmployeeDashboard.jsx
+    │   ├── MyAttendance.jsx
+    │   └── MyRequests.jsx
+    ├── hr/
+    │   ├── HRDashboard.jsx
+    │   ├── PendingRequests.jsx
+    │   ├── EmployeeList.jsx
+    │   └── AttendanceOverview.jsx
+    ├── admin/
+    │   ├── AdminDashboard.jsx
+    │   └── DepartmentsPage.jsx
+    └── shared/
+        └── ProjectsPage.jsx   ← Used by all 3 roles
+```
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+## API Integration
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+Every page calls the backend via typed helpers in `src/services/api.js`:
 
-## Learn More
+```js
+import { attendanceAPI, projectAPI, requestAPI } from '../services/api';
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+// Employee clocks in
+await attendanceAPI.clockIn({ workMode: 'Office' });
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+// HR gets pending requests
+const { data } = await requestAPI.getPending({ type: 'Increment' });
 
-### Code Splitting
+// HR approves with new salary
+await requestAPI.updateStatus(id, { status: 'Approved', approvedSalary: 1200000 });
+```
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
-
-### Analyzing the Bundle Size
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
-
-### Making a Progressive Web App
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
-
-### Advanced Configuration
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
-
-### Deployment
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
-
-### `npm run build` fails to minify
-
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+JWT is automatically injected into every request by the Axios interceptor.
+On 401, the user is auto-logged-out and redirected to /login.
