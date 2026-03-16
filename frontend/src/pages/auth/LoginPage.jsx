@@ -5,11 +5,7 @@ import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { Icon, Spinner } from '../../components/common/index.jsx';
 
-const DEMO = {
-  Admin:    { email: 'admin@hrms.local',    password: 'Admin@123456' },
-  HR:       { email: 'hr@hrms.local',       password: 'Hr@123456' },
-  Employee: { email: 'employee@hrms.local', password: 'Emp@123456' },
-};
+
 
 export default function LoginPage() {
   const { login } = useAuth();
@@ -122,30 +118,7 @@ export default function LoginPage() {
             </button>
           </form>
 
-          {/* Demo Credentials */}
-          <div className="divider" style={{ margin: '24px 0' }}/>
-          <p style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.07em', textAlign: 'center', marginBottom: 12 }}>
-            Quick Demo Access
-          </p>
-          <div className="flex gap-8">
-            {Object.entries(DEMO).map(([role, creds]) => (
-              <button
-                key={role}
-                type="button"
-                onClick={() => { setForm(creds); setErrors({}); }}
-                style={{
-                  flex: 1, padding: '8px 4px', fontSize: 12, fontWeight: 600,
-                  border: '1.5px solid var(--gray-200)', borderRadius: 'var(--radius-md)',
-                  background: 'var(--gray-50)', color: 'var(--gray-600)', cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--blue-400)'; e.currentTarget.style.color='var(--blue-700)'; e.currentTarget.style.background='var(--blue-50)'; }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor='var(--gray-200)'; e.currentTarget.style.color='var(--gray-600)'; e.currentTarget.style.background='var(--gray-50)'; }}
-              >
-                {role}
-              </button>
-            ))}
-          </div>
+          
 
           <p style={{ fontSize: 11, color: 'var(--gray-300)', textAlign: 'center', marginTop: 16 }}>
             Click a role above to fill credentials, then sign in.
