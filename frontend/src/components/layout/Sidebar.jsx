@@ -1,4 +1,5 @@
 // src/components/layout/Sidebar.jsx
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon } from '../common/index.jsx';
 
@@ -43,9 +44,14 @@ const NAV = {
 const roleBadgeColor = { Admin: 'var(--purple-600)', HR: 'var(--blue-600)', Employee: 'var(--green-600)' };
 const roleBadgeBg    = { Admin: 'var(--purple-50)',  HR: 'var(--blue-50)',   Employee: 'var(--green-50)' };
 
-export default function Sidebar({ activePage, onNavigate }) {
+export default function Sidebar() {
   const { user, role, logout } = useAuth();
-  const nav = NAV[role] || [];
+  
+  // Guard against undefined roles during initial load/logout
+  const nav = role && NAV[role] ? NAV[role] : [];
+  
+  // Construct the base path dynamically (e.g., "/admin", "/hr", "/employee")
+  const basePath = role ? `/${role.toLowerCase()}` : '';
 
   return (
     <aside className="sidebar">
@@ -63,14 +69,14 @@ export default function Sidebar({ activePage, onNavigate }) {
           <div key={section} className="nav-section">
             <div className="nav-section-label">{section}</div>
             {items.map(({ id, label, icon }) => (
-              <button
+              <NavLink
                 key={id}
-                className={`nav-item ${activePage === id ? 'active' : ''}`}
-                onClick={() => onNavigate(id)}
+                to={`${basePath}/${id}`}
+                className={({ isActive }) => `nav-item ${isActive ? 'active' : ''}`}
               >
                 <Icon name={icon} size={16}/>
                 {label}
-              </button>
+              </NavLink>
             ))}
           </div>
         ))}
@@ -80,15 +86,17 @@ export default function Sidebar({ activePage, onNavigate }) {
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 10px', marginBottom: 6 }}>
           <div className="avatar" style={{ width: 34, height: 34, fontSize: 12 }}>
-            {user?.firstName?.[0]}{user?.lastName?.[0]}
+            {user?.firstName?.[0] || ''}{user?.lastName?.[0] || ''}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-900)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-              {user?.firstName} {user?.lastName}
+              {user?.firstName || 'User'} {user?.lastName || ''}
             </div>
-            <div style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: 'var(--radius-full)', fontSize: 10, fontWeight: 700, background: roleBadgeBg[role], color: roleBadgeColor[role], marginTop: 2 }}>
-              {role}
-            </div>
+            {role && (
+              <div style={{ display: 'inline-flex', alignItems: 'center', padding: '1px 7px', borderRadius: 'var(--radius-full)', fontSize: 10, fontWeight: 700, background: roleBadgeBg[role], color: roleBadgeColor[role], marginTop: 2 }}>
+                {role}
+              </div>
+            )}
           </div>
         </div>
         <button className="nav-item" onClick={logout} style={{ color: 'var(--red-600)' }}>

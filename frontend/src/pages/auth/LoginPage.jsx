@@ -41,8 +41,8 @@ export default function LoginPage() {
     try {
       const user = await login(form.email, form.password);
       toast.success(`Welcome back, ${user.firstName}!`);
-      const routes = { Admin: '/admin', HR: '/hr', Employee: '/employee' };
-      navigate(routes[user.role] || '/employee');
+      const routes = { Admin: '/admin/dashboard', HR: '/hr/dashboard', Employee: '/employee/dashboard' };
+      navigate(routes[user.role] || '/employee/dashboard');
     } catch (err) {
       toast.error(err.message);
     }

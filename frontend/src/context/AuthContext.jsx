@@ -8,21 +8,26 @@ export const AuthProvider = ({ children }) => {
   const [user,    setUser]    = useState(null);
   const [loading, setLoading] = useState(true);
 
-  // Hydrate from localStorage on mount
-  useEffect(() => {
-    const storedUser  = localStorage.getItem('hrms_user');
-    const storedToken = localStorage.getItem('hrms_token');
-    if (storedUser && storedToken) {
-      try { setUser(JSON.parse(storedUser)); } catch { clearStorage(); }
-    }
-    setLoading(false);
-  }, []);
-
   const clearStorage = () => {
     localStorage.removeItem('hrms_token');
     localStorage.removeItem('hrms_user');
   };
 
+  // 1. Hydrate from localStorage on mount
+  useEffect(() => {
+    const storedUser  = localStorage.getItem('hrms_user');
+    const storedToken = localStorage.getItem('hrms_token');
+    if (storedUser && storedToken) {
+      try { 
+        setUser(JSON.parse(storedUser)); 
+      } catch { 
+        clearStorage(); 
+      }
+    }
+    setLoading(false);
+  }, []);
+
+  // 2. Auth Methods
   const login = useCallback(async (email, password) => {
     const { data } = await api.post('/auth/login', { email, password });
     localStorage.setItem('hrms_token', data.token);
@@ -44,6 +49,24 @@ export const AuthProvider = ({ children }) => {
     });
   }, []);
 
+  // 3. System Event Listeners
+  // Listen for 401 Unauthorized events from the API interceptor
+  useEffect(() => {
+    const handleAuthExpired = () => {
+      // Clear state safely. The RequireAuth router guard will catch this 
+      // and natively redirect the user to /login without a hard reload.
+      logout(); 
+    };
+
+    window.addEventListener('hrms:auth-expired', handleAuthExpired);
+    
+    // Cleanup listener to prevent memory leaks
+    return () => {
+      window.removeEventListener('hrms:auth-expired', handleAuthExpired);
+    };
+  }, [logout]);
+
+  // 4. Context Value payload
   const value = {
     user,
     loading,

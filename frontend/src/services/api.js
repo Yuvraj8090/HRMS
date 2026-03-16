@@ -1,6 +1,4 @@
 // src/services/api.js
-// Axios instance — JWT auto-injected, 401 auto-logout
-
 import axios from 'axios';
 
 const BASE_URL = import.meta.env.VITE_API_URL || '/api';
@@ -11,35 +9,43 @@ const api = axios.create({
   headers: { 'Content-Type': 'application/json' },
 });
 
-// ── Request: inject JWT ─────────────────────────────────────────────────────
+// ── Request: Inject JWT ─────────────────────────────────────────────────────
 api.interceptors.request.use(
   (config) => {
     const token = localStorage.getItem('hrms_token');
-    if (token) config.headers.Authorization = `Bearer ${token}`;
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
     return config;
   },
   (err) => Promise.reject(err)
 );
 
-// ── Response: normalise errors, handle 401 ──────────────────────────────────
+// ── Response: Centralized Error Handling ────────────────────────────────────
 api.interceptors.response.use(
   (res) => res,
   (err) => {
+    // 1. Handle 401 Unauthorized globally without breaking the SPA
     if (err.response?.status === 401) {
       localStorage.removeItem('hrms_token');
       localStorage.removeItem('hrms_user');
-      if (!window.location.pathname.includes('/login')) {
-        window.location.href = '/login';
-      }
+      
+      // Dispatch an event instead of hard-redirecting
+      window.dispatchEvent(new CustomEvent('hrms:auth-expired'));
     }
-    const message = err.response?.data?.message || err.message || 'Something went wrong.';
+
+    // 2. Normalize standard error messages
+    const message = err.response?.data?.message || err.message || 'An unexpected error occurred.';
+    
+    // In TDD/Architect mode, returning a predictable Error object is mandatory
     return Promise.reject(new Error(message));
   }
 );
 
 export default api;
 
-// ── Auth ────────────────────────────────────────────────────────────────────
+// ── API Contracts (Domain Segregation) ──────────────────────────────────────
+
 export const authAPI = {
   login:          (data) => api.post('/auth/login', data),
   register:       (data) => api.post('/auth/register', data),
@@ -47,7 +53,6 @@ export const authAPI = {
   changePassword: (data) => api.put('/auth/change-password', data),
 };
 
-// ── Employees ───────────────────────────────────────────────────────────────
 export const employeeAPI = {
   getAll:     (params)    => api.get('/employees', { params }),
   getOne:     (id)        => api.get(`/employees/${id}`),
@@ -56,7 +61,6 @@ export const employeeAPI = {
   deactivate: (id)        => api.delete(`/employees/${id}`),
 };
 
-// ── Departments ─────────────────────────────────────────────────────────────
 export const departmentAPI = {
   getAll:  ()         => api.get('/departments'),
   getOne:  (id)       => api.get(`/departments/${id}`),
@@ -65,7 +69,6 @@ export const departmentAPI = {
   delete:  (id)       => api.delete(`/departments/${id}`),
 };
 
-// ── Designations ────────────────────────────────────────────────────────────
 export const designationAPI = {
   getAll:  (params)   => api.get('/designations', { params }),
   create:  (data)     => api.post('/designations', data),
@@ -73,7 +76,6 @@ export const designationAPI = {
   delete:  (id)       => api.delete(`/designations/${id}`),
 };
 
-// ── Attendance ──────────────────────────────────────────────────────────────
 export const attendanceAPI = {
   clockIn:         (data)   => api.post('/attendance/clock-in', data),
   clockOut:        ()       => api.put('/attendance/clock-out'),
@@ -82,7 +84,6 @@ export const attendanceAPI = {
   getDailyOverview:()       => api.get('/attendance/overview'),
 };
 
-// ── Projects ────────────────────────────────────────────────────────────────
 export const projectAPI = {
   getAll:        (params)          => api.get('/projects', { params }),
   getOne:        (id)              => api.get(`/projects/${id}`),
@@ -93,7 +94,6 @@ export const projectAPI = {
   delete:        (id)              => api.delete(`/projects/${id}`),
 };
 
-// ── Requests (Increment & Appraisal) ────────────────────────────────────────
 export const requestAPI = {
   submitIncrement:  (data)             => api.post('/requests/increment', data),
   createAppraisal:  (data)             => api.post('/requests/appraisal', data),
