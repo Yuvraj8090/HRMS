@@ -25,24 +25,15 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (res) => res,
   (err) => {
-    // 1. Handle 401 Unauthorized globally without breaking the SPA
     if (err.response?.status === 401) {
       localStorage.removeItem('hrms_token');
       localStorage.removeItem('hrms_user');
-      
-      // Dispatch an event instead of hard-redirecting
       window.dispatchEvent(new CustomEvent('hrms:auth-expired'));
     }
-
-    // 2. Normalize standard error messages
     const message = err.response?.data?.message || err.message || 'An unexpected error occurred.';
-    
-    // In TDD/Architect mode, returning a predictable Error object is mandatory
     return Promise.reject(new Error(message));
   }
 );
-
-export default api;
 
 // ── API Contracts (Domain Segregation) ──────────────────────────────────────
 
@@ -59,6 +50,38 @@ export const employeeAPI = {
   create:     (data)      => api.post('/employees', data),
   update:     (id, data)  => api.put(`/employees/${id}`, data),
   deactivate: (id)        => api.delete(`/employees/${id}`),
+  // ── NEW: Bulk Employee Import ──
+  importAll:  (formData) => api.post('/employees/import-all', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
+export const attendanceAPI = {
+  clockIn:         (data)   => api.post('/attendance/clock-in', data),
+  clockOut:        ()       => api.put('/attendance/clock-out'),
+  getToday:        ()       => api.get('/attendance/today'),
+  getHistory:      (params) => api.get('/attendance/history', { params }),
+  getDailyOverview:()       => api.get('/attendance/overview'),
+  importExcel:     (formData) => api.post('/attendance/import', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+};
+
+export const leaveAPI = {
+  apply: (formData) => api.post('/leaves/apply', formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  process: (id, formData) => api.put(`/leaves/${id}/process`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  getAllPending: () => api.get('/leaves/pending'),
+};
+
+export const contractAPI = {
+  getExpiring: () => api.get('/contracts/expiring'),
+  renew: (id, formData) => api.post(`/contracts/${id}/renew`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
 };
 
 export const departmentAPI = {
@@ -74,14 +97,6 @@ export const designationAPI = {
   create:  (data)     => api.post('/designations', data),
   update:  (id, data) => api.put(`/designations/${id}`, data),
   delete:  (id)       => api.delete(`/designations/${id}`),
-};
-
-export const attendanceAPI = {
-  clockIn:         (data)   => api.post('/attendance/clock-in', data),
-  clockOut:        ()       => api.put('/attendance/clock-out'),
-  getToday:        ()       => api.get('/attendance/today'),
-  getHistory:      (params) => api.get('/attendance/history', { params }),
-  getDailyOverview:()       => api.get('/attendance/overview'),
 };
 
 export const projectAPI = {
@@ -103,3 +118,5 @@ export const requestAPI = {
   updateStatus:     (id, data)         => api.put(`/requests/${id}/status`, data),
   updateStage:      (id, stageId, data)=> api.put(`/requests/${id}/stage/${stageId}`, data),
 };
+
+export default api;

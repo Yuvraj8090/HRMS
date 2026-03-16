@@ -4,6 +4,9 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import AppLayout from './components/layout/AppLayout';
 import { PageSpinner } from './components/common/index.jsx';
+import LeaveApplication from './pages/employee/LeaveApplication';
+import ManageLeaves from './pages/hr/ManageLeaves';
+import ContractManagement from './pages/hr/ContractManagement';
 
 // ── Pages ──────────────────────────────────────────────────────────────────────
 import LoginPage from './pages/auth/LoginPage';
@@ -101,15 +104,20 @@ export default function App() {
                   <Route path="attendance" element={<AttendanceOverview />} />
                   <Route path="requests" element={<PendingRequests />} />
                   <Route path="projects" element={<ProjectsPage />} />
+                  <Route path="leaves" element={<ManageLeaves />} />
+<Route path="contracts" element={<ContractManagement />} />
                 </Route>
 
                 {/* --- HR ROUTES --- */}
                 <Route path="hr" element={<RequireRole allowedRoles={['hr', 'admin']} />}>
                   <Route path="dashboard" element={<HRDashboard />} />
+                  
                   <Route path="employees" element={<EmployeeList />} />
                   <Route path="attendance" element={<AttendanceOverview />} />
                   <Route path="requests" element={<PendingRequests />} />
                   <Route path="projects" element={<ProjectsPage />} />
+                  <Route path="leaves" element={<ManageLeaves />} />
+<Route path="contracts" element={<ContractManagement />} />
                 </Route>
 
                 {/* --- EMPLOYEE ROUTES --- */}
@@ -118,6 +126,7 @@ export default function App() {
                   <Route path="attendance" element={<MyAttendance />} />
                   <Route path="requests" element={<MyRequests />} />
                   <Route path="projects" element={<ProjectsPage />} />
+                  <Route path="leaves/apply" element={<LeaveApplication />} />
                 </Route>
 
               </Route>

@@ -12,13 +12,17 @@ import rateLimit from 'express-rate-limit';
 import { connectDB } from './src/config/db.js';
 
 // ── Route Imports ──────────────────────────────────────────────────────────────
-import authRoutes       from './src/routes/auth.routes.js';
-import employeeRoutes   from './src/routes/employee.routes.js';
-import departmentRoutes from './src/routes/department.routes.js';
+import authRoutes        from './src/routes/auth.routes.js';
+import employeeRoutes    from './src/routes/employee.routes.js';
+import departmentRoutes  from './src/routes/department.routes.js';
 import designationRoutes from './src/routes/designation.routes.js';
-import attendanceRoutes from './src/routes/attendance.routes.js';
-import projectRoutes    from './src/routes/project.routes.js';
-import requestRoutes    from './src/routes/request.routes.js';
+import attendanceRoutes  from './src/routes/attendance.routes.js';
+import projectRoutes     from './src/routes/project.routes.js';
+import requestRoutes     from './src/routes/request.routes.js';
+
+// Fixed import paths for the new modules
+import contractRoutes    from './src/routes/contract.routes.js';
+import leaveRoutes       from './src/routes/leave.routes.js';
 
 // ── Config ─────────────────────────────────────────────────────────────────────
 dotenv.config();
@@ -49,8 +53,8 @@ if (process.env.NODE_ENV === 'development') {
 
 // Global rate limiter — 100 requests per 15 minutes
 const globalLimiter = rateLimit({
-  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS),
-  max: Number(process.env.RATE_LIMIT_MAX),
+  windowMs: Number(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // Fallback added to prevent NaN errors
+  max: Number(process.env.RATE_LIMIT_MAX) || 100,
   standardHeaders: true,
   legacyHeaders: false,
   message: { success: false, message: 'Too many requests, please try again later.' },
@@ -65,6 +69,10 @@ app.use('/api/designations', designationRoutes);
 app.use('/api/attendance',   attendanceRoutes);
 app.use('/api/projects',     projectRoutes);
 app.use('/api/requests',     requestRoutes);
+
+// Mounted the new route handlers
+app.use('/api/contracts',    contractRoutes);
+app.use('/api/leaves',       leaveRoutes);
 
 // ── Health Check ───────────────────────────────────────────────────────────────
 app.get('/api/health', (_req, res) => {
@@ -113,7 +121,7 @@ app.use((err, _req, res, _next) => {
 // ── Boot ───────────────────────────────────────────────────────────────────────
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`\n🚀 HRMS Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+  console.log(`\n🚀 HRMS Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
 
 export default app;

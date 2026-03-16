@@ -169,13 +169,44 @@ export const ProgressBar = ({ value = 0 }) => (
 );
 
 // ── Avatar ─────────────────────────────────────────────────────────────────
-export const Avatar = ({ name = '', size = 36 }) => {
-  const initials = name.split(' ').slice(0, 2).map(w => w[0]).join('').toUpperCase();
-  return (
-    <div className="avatar" style={{ width: size, height: size, fontSize: size * 0.36 }}>
-      {initials || '?'}
-    </div>
-  );
+export const Avatar = ({ name = 'User', size = 40, src = null }) => {
+  const initials = name
+    .split(' ')
+    .map((n) => n[0])
+    .join('')
+    .toUpperCase()
+    .slice(0, 2);
+
+  // Deterministic color based on name string
+  const colors = [
+    '#2563eb', '#7c3aed', '#db2777', '#dc2626', 
+    '#ea580c', '#ca8a04', '#16a34a', '#0891b2'
+  ];
+  const colorIndex = name.length % colors.length;
+  const bgColor = colors[colorIndex];
+
+  const style = {
+    width: size,
+    height: size,
+    borderRadius: '50%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    fontSize: size * 0.4,
+    fontWeight: 700,
+    color: '#fff',
+    backgroundColor: bgColor,
+    flexShrink: 0,
+    overflow: 'hidden',
+    border: '2px solid #fff',
+    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+  };
+
+  if (src) {
+    return <img src={src} alt={name} style={style} />;
+  }
+
+  return <div style={style}>{initials}</div>;
 };
 
 // ── Currency formatter ─────────────────────────────────────────────────────

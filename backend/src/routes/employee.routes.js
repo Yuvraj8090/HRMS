@@ -1,6 +1,3 @@
-/**
- * src/routes/employee.routes.js
- */
 import { Router } from 'express';
 import {
   getAllEmployees,
@@ -8,16 +5,30 @@ import {
   createEmployee,
   updateEmployee,
   deactivateEmployee,
+  importAllEmployeesExcel,
 } from '../controllers/employee.controller.js';
 import { authMiddleware, checkRole, checkSelfOrRole } from '../middleware/auth.middleware.js';
+import { upload } from '../middleware/upload.middleware.js';
+
 
 const router = Router();
 router.use(authMiddleware);
 
-router.get  ('/',    checkRole(['Admin', 'HR']),   getAllEmployees);
-router.post ('/',    checkRole(['Admin', 'HR']),   createEmployee);
-router.get  ('/:id', checkSelfOrRole(['Admin', 'HR']), getEmployee);
-router.put  ('/:id', checkSelfOrRole(['Admin', 'HR']), updateEmployee);
-router.delete('/:id', checkRole(['Admin']),           deactivateEmployee);
+// 1. STATIC ROUTES FIRST
+router.get('/', checkRole(['Admin', 'HR']), getAllEmployees);
+
+// THIS MUST BE ABOVE /:id
+router.post('/import-all', 
+  checkRole(['Admin', 'HR']), 
+  upload.single('file'), 
+  importAllEmployeesExcel
+);
+
+router.post('/', checkRole(['Admin', 'HR']), createEmployee);
+
+// 2. DYNAMIC ROUTES LAST
+router.get('/:id', checkSelfOrRole(['Admin', 'HR']), getEmployee);
+router.put('/:id', checkSelfOrRole(['Admin', 'HR']), updateEmployee);
+router.delete('/:id', checkRole(['Admin']), deactivateEmployee);
 
 export default router;

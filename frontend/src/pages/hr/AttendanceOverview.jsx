@@ -1,103 +1,135 @@
-// src/pages/hr/AttendanceOverview.jsx
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useToast } from '../../context/ToastContext';
 import { attendanceAPI } from '../../services/api';
-import { Badge, Spinner, EmptyState, Avatar, Icon } from '../../components/common/index.jsx';
+import { Avatar, Badge, Spinner, fmtDate } from '../../components/common/index.jsx';
 
 export default function AttendanceOverview() {
-  const [records,  setRecords]  = useState([]);
-  const [loading,  setLoading]  = useState(true);
+  const toast = useToast();
+  const [records, setRecords] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
+  const [excelFile, setExcelFile] = useState(null);
+  const [isImporting, setIsImporting] = useState(false);
 
-  useEffect(() => {
-    const load = async () => {
-      try {
-        const { data } = await attendanceAPI.getDailyOverview();
-        setRecords(data.data || []);
-      } catch { setRecords([]); }
+  useEffect(() => { fetchTodayOverview(); }, []);
+
+  const fetchTodayOverview = async () => {
+    try {
+      setLoading(true);
+      const response = await attendanceAPI.getDailyOverview();
+      setRecords(response.data?.data || []);
+    } catch (error) {
+      // FIX: Updated to use the correct toast method
+      toast.error('Failed to fetch today\'s attendance.');
+    } finally {
       setLoading(false);
-    };
-    load();
-  }, []);
+    }
+  };
 
-  const formatTime = (d) => d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
-  const hours = (r) => r.clockIn && r.clockOut
-    ? ((new Date(r.clockOut) - new Date(r.clockIn)) / 3600000).toFixed(1)
-    : r.clockIn ? ((new Date() - new Date(r.clockIn)) / 3600000).toFixed(1) : null;
+  const handleImportSubmit = async (e) => {
+    e.preventDefault();
+    if (!excelFile) return toast.error('Please select a file first.'); // FIX applied here
 
-  const today = new Date().toLocaleDateString('en-IN', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    setIsImporting(true);
+    try {
+      const formData = new FormData();
+      formData.append('file', excelFile);
+      await attendanceAPI.importExcel(formData);
+      
+      // FIX: Updated to use toast.success
+      toast.success('Attendance imported successfully.');
+      
+      setExcelFile(null);
+      setIsImportModalOpen(false);
+      fetchTodayOverview();
+    } catch (error) {
+      // FIX: Updated to use toast.error
+      toast.error(error.message || 'Failed to import attendance.');
+    } finally {
+      setIsImporting(false);
+    }
+  };
 
   return (
-    <div style={{ animation: 'fadeIn 0.3s ease' }}>
-      <div className="mb-24">
-        <h2 className="page-title">Today's Attendance</h2>
-        <p className="page-sub">{today}</p>
-      </div>
-
-      {/* Summary */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(150px,1fr))', gap: 14, marginBottom: 24 }}>
-        {[
-          { label: 'Present',   count: records.filter(r=>r.status==='Present').length,   color: 'var(--green-600)', bg: 'var(--green-50)' },
-          { label: 'Still In',  count: records.filter(r=>r.clockIn && !r.clockOut).length, color: 'var(--blue-600)', bg: 'var(--blue-50)' },
-          { label: 'Completed', count: records.filter(r=>r.clockOut).length,             color: 'var(--purple-600)', bg: 'var(--purple-50)' },
-          { label: 'Total',     count: records.length,                                    color: 'var(--gray-600)', bg: 'var(--gray-100)' },
-        ].map(({ label, count, color, bg }) => (
-          <div key={label} className="card" style={{ padding: '16px 18px' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em', marginBottom: 4 }}>{label}</div>
-            <div style={{ fontFamily: 'var(--font-display)', fontSize: 26, fontWeight: 800, color }}>{count}</div>
-          </div>
-        ))}
-      </div>
-
-      <div className="card">
-        <div className="card-header">
-          <span className="section-title">Employee Check-ins</span>
-          <span style={{ fontSize: 12, color: 'var(--gray-400)' }}>{records.length} records</span>
+    <div className="dashboard-container animate-fade-in">
+      <header className="dashboard-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: '40px' }}>
+        <div className="banner-decoration-top" />
+        <div className="banner-decoration-bottom" />
+        <div className="banner-content">
+          <p className="banner-subtitle">HR Operations</p>
+          <h1 className="banner-title">Daily Attendance</h1>
+          <p className="banner-date">{fmtDate(new Date())}</p>
         </div>
-        {loading ? (
-          <div style={{ display: 'flex', justifyContent: 'center', padding: 40 }}><Spinner large/></div>
-        ) : records.length === 0 ? (
-          <EmptyState icon="📋" title="No check-ins yet" sub="Employees haven't clocked in today"/>
-        ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Clock In</th>
-                  <th>Clock Out</th>
-                  <th>Hours</th>
-                  <th>Mode</th>
-                  <th>Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {records.map(r => {
-                  const h = hours(r);
-                  const stillin = r.clockIn && !r.clockOut;
-                  return (
-                    <tr key={r._id}>
-                      <td>
-                        <div className="flex items-center gap-8">
-                          <div style={{ width: 8, height: 8, borderRadius: '50%', background: stillin ? 'var(--green-500)' : 'var(--gray-300)', flexShrink: 0, boxShadow: stillin ? '0 0 0 3px rgba(34,197,94,0.2)' : 'none' }}/>
-                          <Avatar name={`${r.employee?.firstName} ${r.employee?.lastName}`} size={30}/>
-                          <div>
-                            <div style={{ fontWeight: 600, fontSize: 13 }}>{r.employee?.firstName} {r.employee?.lastName}</div>
-                            <div style={{ fontSize: 11, color: 'var(--gray-400)' }}>{r.employee?.email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td style={{ fontWeight: 600 }}>{formatTime(r.clockIn)}</td>
-                      <td>{r.clockOut ? formatTime(r.clockOut) : <span style={{ color: 'var(--gray-300)' }}>Active</span>}</td>
-                      <td>{h ? <span style={{ fontWeight: 700, color: Number(h) >= 8 ? 'var(--green-600)' : 'var(--amber-600)' }}>{h}h</span> : '—'}</td>
-                      <td style={{ fontSize: 12, color: 'var(--gray-500)' }}>{r.workMode}</td>
-                      <td><Badge label={r.status}/></td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        <div style={{ zIndex: 10 }}>
+          <button 
+            onClick={() => setIsImportModalOpen(true)}
+            style={{ background: '#fff', color: 'var(--green-600)', padding: '10px 20px', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+          >
+            + Import Excel
+          </button>
+        </div>
+      </header>
+
+      <section className="mb-24">
+        <article className="card">
+          <header className="card-header">
+            <div>
+              <h2 className="section-title">Today's Roster</h2>
+              <span className="section-subtitle">Real-time clock-ins and outs</span>
+            </div>
+          </header>
+          
+          <div className="card-body">
+            {loading ? (
+              <div className="flex-center p-32"><Spinner large /></div>
+            ) : records.length === 0 ? (
+              <p className="empty-state">No attendance records for today.</p>
+            ) : (
+              <ul className="list-group">
+                {records.map(record => (
+                  <li key={record._id} className="list-item">
+                    <Avatar name={`${record.employee?.firstName} ${record.employee?.lastName}`} size={40} />
+                    <div className="list-item-content">
+                      <p className="item-title">{record.employee?.firstName} {record.employee?.lastName}</p>
+                      <p className="item-meta">
+                        In: {record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : '--:--'} | 
+                        Out: {record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : '--:--'}
+                      </p>
+                    </div>
+                    <div className="list-item-actions">
+                      <Badge label={record.status} style={{ background: record.status === 'Present' ? 'var(--green-50)' : 'var(--red-50)', color: record.status === 'Present' ? 'var(--green-600)' : 'var(--red-600)' }} />
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            )}
           </div>
-        )}
-      </div>
+        </article>
+      </section>
+
+      {/* Import Modal */}
+      {isImportModalOpen && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
+          <article className="card" style={{ width: '100%', maxWidth: '400px' }}>
+            <header className="card-header">
+              <div>
+                <h2 className="section-title">Bulk Import</h2>
+                <span className="section-subtitle">Upload .xlsx or .csv</span>
+              </div>
+            </header>
+            <div className="card-body" style={{ padding: '20px' }}>
+              <form onSubmit={handleImportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+                <input type="file" onChange={e => setExcelFile(e.target.files[0])} accept=".xlsx,.xls,.csv" style={{ width: '100%', padding: '20px', border: '2px dashed var(--gray-300)', borderRadius: '6px', textAlign: 'center' }} />
+                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
+                  <button type="button" onClick={() => setIsImportModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--gray-300)', background: '#fff', cursor: 'pointer' }}>Cancel</button>
+                  <button type="submit" disabled={isImporting || !excelFile} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'var(--green-600)', color: '#fff', cursor: 'pointer' }}>{isImporting ? 'Processing...' : 'Upload'}</button>
+                </div>
+              </form>
+            </div>
+          </article>
+        </div>
+      )}
     </div>
   );
 }
