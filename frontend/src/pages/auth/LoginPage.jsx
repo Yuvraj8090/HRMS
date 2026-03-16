@@ -120,9 +120,7 @@ export default function LoginPage() {
 
           
 
-          <p style={{ fontSize: 11, color: 'var(--gray-300)', textAlign: 'center', marginTop: 16 }}>
-            Click a role above to fill credentials, then sign in.
-          </p>
+          
         </div>
       </div>
     </div>
