@@ -2,73 +2,88 @@ import { useMemo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
-  getSortedRowModel,
-  getPaginationRowModel,
-  getFilteredRowModel,
   flexRender,
 } from '@tanstack/react-table';
-import { Badge, Spinner, Avatar, Icon, currency } from '../../../components/common/index.jsx';
 
-const STATUS_CONFIG = {
-  'Active': { bg: '#ecfdf5', color: '#059669' },
-  'On Leave': { bg: '#fffbeb', color: '#d97706' },
-  'Resigned': { bg: '#fef2f2', color: '#dc2626' },
-  'Terminated': { bg: '#f3f4f6', color: '#4b5563' }
-};
+import { Badge, Avatar, Icon, currency, Skeleton, EmptyState } from '../../../components/common/index.jsx';
 
 export default function EmployeeTable({ 
   data, 
-  isLoading, 
+  isLoading,
+  pageCount,
+  totalRecords,
+  pagination,
+  setPagination, 
   sorting, 
   setSorting, 
-  globalFilter, 
-  setGlobalFilter, 
-  searchInput, 
+  searchInput,
+  setSearchInput, 
   onEdit 
 }) {
+  
   const columns = useMemo(() => [
     {
       header: 'Employee',
       accessorKey: 'user.firstName',
       cell: ({ row }) => {
         const emp = row.original;
+        const fullName = `${emp.user?.firstName || ''} ${emp.user?.lastName || ''}`.trim();
         return (
-          <div className="flex items-center gap-3">
-            <Avatar name={`${emp.user?.firstName || ''} ${emp.user?.lastName || ''}`} size={40} />
-            <div>
-              <div className="font-bold text-gray-900">{emp.user?.firstName} {emp.user?.lastName}</div>
-              <div className="text-xs text-gray-500">{emp.user?.email}</div>
+          <div className="flex items-center gap-12">
+            <Avatar name={fullName} size={36} />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>
+                {fullName || 'Unknown'}
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--gray-400)' }} className="truncate">
+                {emp.user?.email}
+              </div>
             </div>
           </div>
         );
       }
     },
     {
-      header: 'ID & Unit',
-      accessorKey: 'employeeId',
+      header: 'Department & Unit',
+      accessorKey: 'department.name',
       cell: ({ row }) => (
         <div>
-          <span className="font-mono text-blue-600 font-semibold">{row.original.employeeId}</span>
-          <div className="text-xs text-gray-500">{row.original.department?.name || 'Unassigned'}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-800)' }}>
+            {row.original.department?.name || 'Unassigned'}
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--blue-600)', fontFamily: 'monospace', marginTop: 2 }}>
+            {row.original.department?.code || 'N/A'}
+          </div>
         </div>
       )
     },
-    { header: 'Designation', accessorFn: row => row.designation?.title || 'N/A', id: 'designation' },
-    { header: 'Salary', accessorKey: 'currentSalary', cell: ({ getValue }) => <span className="font-medium text-gray-700">{currency(getValue() || 0)}</span> },
+    { 
+      header: 'Designation', 
+      accessorFn: row => row.designation?.title || 'N/A', 
+      id: 'designation',
+      cell: ({ getValue }) => <span style={{ fontSize: 13, color: 'var(--gray-700)' }}>{getValue()}</span>
+    },
+    { 
+      header: 'Salary', 
+      accessorKey: 'currentSalary', 
+      cell: ({ getValue }) => <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>{currency(getValue() || 0)}</span> 
+    },
     {
       header: 'Status',
       accessorKey: 'status',
-      cell: ({ getValue }) => {
-        const status = getValue() || 'Active';
-        return <Badge label={status} style={STATUS_CONFIG[status] || STATUS_CONFIG['Active']} />;
-      }
+      cell: ({ getValue }) => <Badge label={getValue() || 'Active'} />
     },
     {
       header: 'Actions',
       id: 'actions',
       cell: ({ row }) => (
-        <button onClick={() => onEdit(row.original)} className="p-2 hover:bg-blue-50 hover:text-blue-600 rounded-lg transition-colors text-gray-400">
-          <Icon name="edit" size={18} />
+        <button 
+          onClick={() => onEdit(row.original)} 
+          className="btn btn-secondary btn-sm"
+          title="Edit Employee"
+          style={{ padding: '6px 10px' }}
+        >
+          <Icon name="edit" size={16} />
         </button>
       )
     }
@@ -77,85 +92,145 @@ export default function EmployeeTable({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting, globalFilter },
+    state: { pagination, sorting },
+    pageCount,
+    onPaginationChange: setPagination,
     onSortingChange: setSorting,
+    manualPagination: true,
+    manualFiltering: true,
     getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    getPaginationRowModel: getPaginationRowModel(),
-    initialState: { pagination: { pageSize: 10 } },
   });
 
+  const firstRow = totalRecords === 0 ? 0 : (pagination.pageIndex * pagination.pageSize) + 1;
+  const lastRow = Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRecords);
+
   return (
-    <div className="space-y-4">
-      {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-4">
-        <div className="relative flex-1">
-          <Icon name="search" size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+    <div className="card">
+      
+      {/* Table Toolbar */}
+      <div className="card-header flex items-center justify-between gap-16 flex-wrap">
+        {/* Search */}
+        <div style={{ position: 'relative', flex: 1, minWidth: 260, maxWidth: 400 }}>
+          <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', display: 'flex' }}>
+            <Icon name="search" size={16} />
+          </div>
           <input 
+            type="text"
+            className="form-control"
+            placeholder="Search roster by name, email..."
             value={searchInput}
-            onChange={e => setGlobalFilter(e.target.value)}
-            className="w-full pl-11 pr-4 py-3 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500 outline-none shadow-sm"
-            placeholder="Search roster by name, ID or role..."
+            onChange={e => setSearchInput(e.target.value)}
+            style={{ paddingLeft: 38 }}
           />
         </div>
-        <select 
-          className="border border-gray-200 rounded-xl px-4 py-3 bg-white shadow-sm font-medium text-gray-700 outline-none focus:ring-2 focus:ring-blue-500"
-          onChange={e => table.setPageSize(Number(e.target.value))}
-        >
-          {[10, 25, 50].map(size => <option key={size} value={size}>Show {size} rows</option>)}
-        </select>
+
+        {/* Page Size Options */}
+        <div className="flex items-center gap-8">
+          <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase' }}>Rows:</span>
+          <select 
+            className="form-control"
+            value={pagination.pageSize}
+            onChange={e => table.setPageSize(Number(e.target.value))}
+            style={{ width: 'auto', padding: '6px 32px 6px 12px', fontSize: 13 }}
+          >
+            {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+          </select>
+        </div>
       </div>
 
-      {/* Table Body */}
-      <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-x-auto">
-        <table className="w-full text-left border-collapse min-w-[800px]">
-          <thead className="bg-gray-50/80 border-b border-gray-200">
+      {/* Data Table */}
+      <div className="table-wrap">
+        <table>
+          <thead>
             {table.getHeaderGroups().map(group => (
               <tr key={group.id}>
                 {group.headers.map(header => (
-                  <th 
-                    key={header.id} 
-                    className="p-4 text-xs font-bold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100 transition-colors select-none"
-                    onClick={header.column.getToggleSortingHandler()}
-                  >
-                    <div className="flex items-center gap-2">
-                      {flexRender(header.column.columnDef.header, header.getContext())}
-                      {{ asc: ' 🔼', desc: ' 🔽' }[header.column.getIsSorted()] ?? null}
-                    </div>
+                  <th key={header.id}>
+                    {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
               </tr>
             ))}
           </thead>
-          <tbody className="divide-y divide-gray-100">
+          <tbody>
             {isLoading ? (
-              <tr><td colSpan={columns.length} className="p-12 text-center"><Spinner large /></td></tr>
-            ) : table.getRowModel().rows.length === 0 ? (
-              <tr><td colSpan={columns.length} className="p-12 text-center text-gray-500 font-medium">No personnel found matching your criteria.</td></tr>
-            ) : table.getRowModel().rows.map(row => (
-              <tr key={row.id} className="hover:bg-blue-50/40 transition-colors group">
-                {row.getVisibleCells().map(cell => (
-                  <td key={cell.id} className="p-4 text-sm text-gray-700">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+              // Skeleton Loading Rows
+              Array.from({ length: pagination.pageSize }).map((_, i) => (
+                <tr key={`skeleton-${i}`}>
+                  <td>
+                    <div className="flex items-center gap-12">
+                      <Skeleton height={36} width="36px" style={{ borderRadius: '50%' }} />
+                      <div className="flex-col gap-4 flex-1">
+                        <Skeleton height={14} width="120px" />
+                        <Skeleton height={10} width="80px" />
+                      </div>
+                    </div>
                   </td>
-                ))}
+                  <td><Skeleton height={14} width="100px" /></td>
+                  <td><Skeleton height={14} width="140px" /></td>
+                  <td><Skeleton height={14} width="80px" /></td>
+                  <td><Skeleton height={20} width="60px" style={{ borderRadius: 10 }} /></td>
+                  <td><Skeleton height={28} width="36px" style={{ borderRadius: 6 }} /></td>
+                </tr>
+              ))
+            ) : table.getRowModel().rows.length === 0 ? (
+              // Empty State
+              <tr>
+                <td colSpan={columns.length} style={{ padding: '48px 20px' }}>
+                  <EmptyState 
+                    icon="🔍" 
+                    title="No personnel found" 
+                    sub={`We couldn't find anyone matching "${searchInput}".`}
+                    action={
+                      searchInput && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => setSearchInput('')}>
+                          Clear Search
+                        </button>
+                      )
+                    }
+                  />
+                </td>
               </tr>
-            ))}
+            ) : (
+              // Data Rows
+              table.getRowModel().rows.map(row => (
+                <tr key={row.id}>
+                  {row.getVisibleCells().map(cell => (
+                    <td key={cell.id}>
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              ))
+            )}
           </tbody>
         </table>
+      </div>
 
-        {/* Pagination Controls */}
-        <div className="p-4 border-t border-gray-200 flex items-center justify-between bg-gray-50/50">
-          <span className="text-sm text-gray-600 font-medium">
-            Page {table.getState().pagination.pageIndex + 1} of {table.getPageCount() || 1}
-          </span>
-          <div className="flex gap-2">
-            <button disabled={!table.getCanPreviousPage()} onClick={() => table.previousPage()} className="px-4 py-2 bg-white border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50 font-medium text-sm transition-colors">Prev</button>
-            <button disabled={!table.getCanNextPage()} onClick={() => table.nextPage()} className="px-4 py-2 bg-white border border-gray-300 rounded-lg disabled:opacity-50 hover:bg-gray-50 font-medium text-sm transition-colors">Next</button>
-          </div>
+      {/* Pagination Footer */}
+      <div className="card-header flex items-center justify-between" style={{ borderTop: '1px solid var(--gray-100)', borderBottom: 'none' }}>
+        <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>
+          Showing <strong style={{ color: 'var(--gray-900)' }}>{firstRow}</strong> to <strong style={{ color: 'var(--gray-900)' }}>{lastRow}</strong> of <strong style={{ color: 'var(--gray-900)' }}>{totalRecords}</strong> entries
+        </span>
+        
+        <div className="flex gap-8">
+          <button 
+            className="btn btn-secondary btn-sm"
+            disabled={!table.getCanPreviousPage() || isLoading} 
+            onClick={() => table.previousPage()} 
+          >
+            Prev
+          </button>
+          <button 
+            className="btn btn-secondary btn-sm"
+            disabled={!table.getCanNextPage() || isLoading} 
+            onClick={() => table.nextPage()} 
+          >
+            Next
+          </button>
         </div>
       </div>
+
     </div>
   );
 }

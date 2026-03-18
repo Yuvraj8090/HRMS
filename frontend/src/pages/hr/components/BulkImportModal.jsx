@@ -1,48 +1,63 @@
-import { Icon, Spinner } from '../../../components/common/index.jsx';
+import { Modal, Spinner, Icon } from '../../../components/common/index.jsx';
 
 export default function BulkImportModal({
   isOpen,
   onClose,
   onSubmit,
   onFileChange,
-  isSubmitting
+  isSubmitting,
+  file
 }) {
   if (!isOpen) return null;
 
+  const footer = (
+    <>
+      <button type="button" onClick={onClose} className="btn btn-secondary">Cancel</button>
+      <button type="submit" form="bulk-import-form" disabled={isSubmitting || !file} className="btn btn-primary" style={{ minWidth: 120 }}>
+        {isSubmitting ? <Spinner /> : 'Start Import'}
+      </button>
+    </>
+  );
+
   return (
-    <div className="fixed inset-0 bg-black/60 flex items-center justify-center z-[1000] p-4 backdrop-blur-sm">
-      <article className="bg-white rounded-2xl w-full max-w-md overflow-hidden shadow-2xl animate-scale-up">
-        <header className="border-b border-gray-100 p-6">
-          <h2 className="text-xl font-bold text-gray-900">Bulk Import Employees</h2>
-        </header>
+    <Modal title="Bulk Import Employees" onClose={onClose} footer={footer}>
+      <form id="bulk-import-form" onSubmit={onSubmit} style={{ padding: '10px 0' }}>
         
-        <div className="p-6">
-          <form onSubmit={onSubmit} className="flex flex-col gap-6">
-            <div className="p-8 border-2 border-dashed border-gray-300 rounded-xl text-center bg-gray-50 hover:bg-gray-100 transition-colors">
-              <Icon name="upload" size={32} className="mx-auto text-gray-400 mb-4" />
-              <p className="text-sm font-medium text-gray-600 mb-4">
-                Select the U-Prepare Current Strength CSV/Excel file.
-              </p>
-              <input 
-                type="file" 
-                onChange={onFileChange} 
-                accept=".xlsx,.xls,.csv" 
-                required 
-                className="w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-sm file:font-bold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100" 
-              />
-            </div>
-            
-            <div className="flex justify-end gap-3 mt-2">
-              <button type="button" onClick={onClose} className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 rounded-lg font-bold hover:bg-gray-50 transition-colors">
-                Cancel
-              </button>
-              <button type="submit" disabled={isSubmitting} className="px-5 py-2.5 bg-emerald-600 text-white rounded-lg font-bold hover:bg-emerald-700 transition-colors disabled:opacity-70 flex items-center justify-center min-w-[140px]">
-                {isSubmitting ? <Spinner size={18} color="#fff" /> : 'Start Import'}
-              </button>
-            </div>
-          </form>
+        <div style={{ 
+          border: '2px dashed var(--gray-300)', 
+          borderRadius: 'var(--radius-lg)', 
+          padding: '40px 20px', 
+          textAlign: 'center',
+          background: 'var(--gray-50)',
+          cursor: 'pointer'
+        }}>
+          <div style={{ display: 'inline-flex', background: 'var(--white)', padding: 12, borderRadius: '50%', boxShadow: 'var(--shadow-sm)', marginBottom: 16 }}>
+            <Icon name="upload" size={24} color="var(--blue-500)" />
+          </div>
+          
+          <h3 style={{ fontSize: 14, fontWeight: 700, color: 'var(--gray-800)', marginBottom: 8 }}>
+            Upload Employee Roster
+          </h3>
+          <p style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 20 }}>
+            Supports .csv, .xls, and .xlsx formats. Ensure columns match the system template.
+          </p>
+          
+          <input 
+            type="file" 
+            onChange={onFileChange} 
+            accept=".xlsx,.xls,.csv" 
+            required 
+            style={{ 
+              fontSize: 13, 
+              color: 'var(--gray-600)',
+              width: '100%',
+              maxWidth: 240,
+              margin: '0 auto'
+            }} 
+          />
         </div>
-      </article>
-    </div>
+
+      </form>
+    </Modal>
   );
 }

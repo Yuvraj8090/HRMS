@@ -1,10 +1,7 @@
-// src/components/common/index.jsx
-// All reusable UI primitives in one file
-
 import { useEffect } from 'react';
 
 // ── SVG Icons ──────────────────────────────────────────────────────────────
-export const Icon = ({ name, size = 18, color = 'currentColor' }) => {
+export const Icon = ({ name, size = 18, color = 'currentColor', className = '' }) => {
   const paths = {
     home:      ['M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z', 'M9 22V12h6v10'],
     users:     ['M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2','M23 21v-2a4 4 0 0 0-3-3.87','M16 3.13a4 4 0 0 1 0 7.75'],
@@ -32,9 +29,12 @@ export const Icon = ({ name, size = 18, color = 'currentColor' }) => {
   };
   const d = paths[name] || [];
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+    <svg 
+      width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-      style={{ flexShrink: 0 }}>
+      className={className}
+      style={{ flexShrink: 0 }}
+    >
       {d.map((p, i) => <path key={i} d={p}/>)}
     </svg>
   );
@@ -73,10 +73,13 @@ const badgeMap = {
   'Late':         'badge-amber',
   'On Leave':     'badge-purple',
   'Half-Day':     'badge-blue',
+  // Termination/Resignation
+  'Resigned':     'badge-red',
+  'Terminated':   'badge-gray',
 };
 
-export const Badge = ({ label }) => (
-  <span className={`badge ${badgeMap[label] || 'badge-gray'}`}>{label}</span>
+export const Badge = ({ label, className = '' }) => (
+  <span className={`badge ${badgeMap[label] || 'badge-gray'} ${className}`}>{label}</span>
 );
 
 // ── Spinner ────────────────────────────────────────────────────────────────
@@ -169,13 +172,14 @@ export const ProgressBar = ({ value = 0 }) => (
 );
 
 // ── Avatar ─────────────────────────────────────────────────────────────────
-export const Avatar = ({ name = 'User', size = 40, src = null }) => {
+export const Avatar = ({ name = 'User', size = 40, src = null, className = '' }) => {
   const initials = name
     .split(' ')
+    .filter(Boolean)
     .map((n) => n[0])
     .join('')
     .toUpperCase()
-    .slice(0, 2);
+    .slice(0, 2) || 'U';
 
   // Deterministic color based on name string
   const colors = [
@@ -203,17 +207,16 @@ export const Avatar = ({ name = 'User', size = 40, src = null }) => {
   };
 
   if (src) {
-    return <img src={src} alt={name} style={style} />;
+    return <img src={src} alt={name} style={style} className={className} />;
   }
 
-  return <div style={style}>{initials}</div>;
+  return <div style={style} className={className}>{initials}</div>;
 };
 
-// ── Currency formatter ─────────────────────────────────────────────────────
+// ── Formatting Utilities ───────────────────────────────────────────────────
 export const currency = (n) =>
   new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 
-// ── Date formatter ─────────────────────────────────────────────────────────
 export const fmtDate  = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' }) : '—';
 export const fmtTime  = (d) => d ? new Date(d).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : '—';
 export const fmtShort = (d) => d ? new Date(d).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' }) : '—';
