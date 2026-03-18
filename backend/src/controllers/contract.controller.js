@@ -11,9 +11,20 @@ export const getExpiringContracts = asyncHandler(async (req, res, next) => {
   const expiringContracts = await Contract.find({
     endDate: { $lte: thirtyDaysFromNow },
     status: 'Active'
-  }).populate('employee', 'employeeId user');
+  }).populate({
+    path: 'employee',
+    select: 'employeeId user', // Select the fields you need from EmployeeProfile
+    populate: {
+      path: 'user', // Now populate the 'user' field INSIDE the EmployeeProfile
+      select: 'firstName lastName email' // Select the name and email from the User model
+    }
+  });
 
-  res.status(200).json({ success: true, count: expiringContracts.length, data: expiringContracts });
+  res.status(200).json({ 
+    success: true, 
+    count: expiringContracts.length, 
+    data: expiringContracts 
+  });
 });
 
 // 2. Renew Contract

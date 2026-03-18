@@ -73,13 +73,19 @@ export const attendanceAPI = {
 };
 
 export const leaveAPI = {
+  // ── Employee ──
+  getCategories: () => api.get('/leaves/categories'),
+  getMyBalances: () => api.get('/leaves/my-balances'),
+  getMyRequests: () => api.get('/leaves/my-requests'),
   apply: (formData) => api.post('/leaves/apply', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  
+  // ── HR / Admin ──
+  getAllPending: () => api.get('/leaves/pending'),
   process: (id, formData) => api.put(`/leaves/${id}/process`, formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
-  getAllPending: () => api.get('/leaves/pending'),
 };
 
 export const contractAPI = {

@@ -103,7 +103,7 @@ export default function AttendanceOverview() {
             onClick={() => setIsImportModalOpen(true)}
             style={{ background: '#fff', color: 'var(--blue-700)', boxShadow: 'var(--shadow-md)', padding: '12px 24px', fontSize: 14 }}
           >
-            <Icon name="upload" size={18} />
+           <Icon name="plus" size={18} />
             Bulk Import Excel
           </button>
         </div>

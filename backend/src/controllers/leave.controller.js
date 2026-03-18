@@ -1,67 +1,144 @@
-import asyncHandler from '../utils/asyncHandler.js';
+import mongoose from 'mongoose';
 import LeaveRequest from '../models/LeaveRequest.model.js';
 import LeaveBalance from '../models/LeaveBalance.model.js';
-import { processLeaveApproval } from '../services/leave.service.js';
+import LeaveCategory from '../models/LeaveCategory.model.js';
+import EmployeeProfile from '../models/EmployeeProfile.model.js';
+import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 
-// 1. Employee applies for leave
+const getCurrentYear = () => new Date().getFullYear();
+
+// ── 1. Apply for Leave (Employee) ──────────────────────────────────────────
 export const applyForLeave = asyncHandler(async (req, res, next) => {
   const { leaveCategoryId, fromDate, toDate, numberOfDays, reason, stationLeavePermission, contactDetailsWhileOnLeave } = req.body;
-  const employeeId = req.user.employeeProfileId; // Assuming auth middleware sets this
 
-  // In a real app, you'd upload req.file.buffer to S3 and get the URL
-  const leaveLetterUrl = req.file ? `uploaded_path/${req.file.originalname}` : null;
+  // 1. Securely resolve the Employee Profile
+  const profile = await EmployeeProfile.findOne({ user: req.user._id });
+  if (!profile) return next(new AppError('Employee profile not found.', 404));
+
+  // 2. Prevent applying for past dates (Basic domain validation)
+  if (new Date(fromDate) < new Date().setHours(0,0,0,0)) {
+    return next(new AppError('Cannot apply for leave in the past.', 400));
+  }
+
+  const leaveLetterUrl = req.file ? `uploaded_path/leaves/requests/${req.file.filename}` : null;
 
   const newRequest = await LeaveRequest.create({
-    employee: employeeId,
+    employee: profile._id,
     leaveCategory: leaveCategoryId,
     fromDate,
     toDate,
-    numberOfDays,
+    numberOfDays: Number(numberOfDays),
     reason,
     stationLeavePermission: stationLeavePermission === 'true',
     contactDetailsWhileOnLeave,
-    leaveLetterUrl
+    leaveLetterUrl,
+    status: 'Pending'
   });
 
   res.status(201).json({ success: true, data: newRequest });
 });
 
-// 2. HR Processes Leave (Approve/Reject)
+// ── 2. Process Leave (HR/Admin) ────────────────────────────────────────────
 export const processLeave = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
   const { decision, remarks } = req.body; // 'Approved' or 'Rejected'
-  
-  const leaveRequest = await LeaveRequest.findById(id);
-  if (!leaveRequest) return next(new AppError('Leave request not found', 404));
-  
-  if (leaveRequest.status !== 'Pending') {
-    return next(new AppError('Leave request is already processed', 400));
+
+  if (!['Approved', 'Rejected'].includes(decision)) {
+    return next(new AppError('Decision must be Approved or Rejected.', 400));
   }
 
-  const currentYear = new Date().getFullYear();
-  const leaveBalance = await LeaveBalance.findOne({ 
-    employee: leaveRequest.employee, 
-    leaveCategory: leaveRequest.leaveCategory,
-    year: currentYear
-  });
+  // START ACID TRANSACTION
+  const session = await mongoose.startSession();
+  session.startTransaction();
 
-  if (!leaveBalance) return next(new AppError('Leave balance record not found', 404));
+  try {
+    const leaveRequest = await LeaveRequest.findById(id).populate('leaveCategory').session(session);
+    if (!leaveRequest) throw new AppError('Leave request not found', 404);
+    if (leaveRequest.status !== 'Pending') throw new AppError(`Leave request is already ${leaveRequest.status}`, 400);
 
-  // Call our pure Domain logic
-  const { updatedBalance, status } = await processLeaveApproval(leaveRequest, leaveBalance, decision);
+    // If Approving, strictly deduct balance within the transaction lock
+    if (decision === 'Approved' && leaveRequest.leaveCategory.code !== 'LWP') {
+      const currentYear = getCurrentYear();
+      const leaveBalance = await LeaveBalance.findOne({ 
+        employee: leaveRequest.employee, 
+        leaveCategory: leaveRequest.leaveCategory._id,
+        year: currentYear
+      }).session(session);
 
-  // Apply DB Updates transactionally (Mocked transaction flow for brevity)
-  leaveRequest.status = status;
-  leaveRequest.remarks = remarks;
-  leaveRequest.approvedBy = req.user._id;
-  
-  if (req.file) {
-    leaveRequest.approvalDocumentUrl = `uploaded_path/${req.file.originalname}`;
+      if (!leaveBalance) throw new AppError('Leave balance record not found for this year.', 404);
+      if (leaveBalance.currentBalance < leaveRequest.numberOfDays) {
+        throw new AppError(`Insufficient balance. Only ${leaveBalance.currentBalance} days remaining.`, 400);
+      }
+
+      // Deduct
+      leaveBalance.currentBalance -= leaveRequest.numberOfDays;
+      leaveBalance.totalApplied += leaveRequest.numberOfDays;
+      await leaveBalance.save({ session });
+    }
+
+    // Update Request Status
+    leaveRequest.status = decision;
+    leaveRequest.remarks = remarks;
+    leaveRequest.approvedBy = req.user._id;
+    
+    if (req.file) {
+      leaveRequest.approvalDocumentUrl = `uploaded_path/leaves/approvals/${req.file.filename}`;
+    }
+
+    await leaveRequest.save({ session });
+    
+    // COMMIT TRANSACTION
+    await session.commitTransaction();
+    res.status(200).json({ success: true, message: `Leave ${decision} successfully.` });
+
+  } catch (error) {
+    // ROLLBACK ON ANY FAILURE OR INSUFFICIENT BALANCE
+    await session.abortTransaction();
+    throw error; 
+  } finally {
+    session.endSession();
   }
+});
 
-  await updatedBalance.save();
-  await leaveRequest.save();
+// ── 3. Read Operations (Required for Frontend) ─────────────────────────────
 
-  res.status(200).json({ success: true, message: `Leave ${status} successfully.` });
+export const getPendingLeaves = asyncHandler(async (req, res) => {
+  const pending = await LeaveRequest.find({ status: 'Pending' })
+    .populate({
+      path: 'employee',
+      select: 'employeeId user',
+      populate: { path: 'user', select: 'firstName lastName email' }
+    })
+    .populate('leaveCategory', 'name code')
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({ success: true, count: pending.length, data: pending });
+});
+
+export const getMyBalances = asyncHandler(async (req, res, next) => {
+  const profile = await EmployeeProfile.findOne({ user: req.user._id });
+  if (!profile) return next(new AppError('Profile not found', 404));
+
+  const balances = await LeaveBalance.find({ employee: profile._id, year: getCurrentYear() })
+    .populate('leaveCategory', 'name code defaultAnnualCount');
+
+  res.status(200).json({ success: true, data: balances });
+});
+
+export const getMyRequests = asyncHandler(async (req, res, next) => {
+  const profile = await EmployeeProfile.findOne({ user: req.user._id });
+  if (!profile) return next(new AppError('Profile not found', 404));
+
+  const requests = await LeaveRequest.find({ employee: profile._id })
+    .populate('leaveCategory', 'name code')
+    .populate('approvedBy', 'firstName lastName')
+    .sort({ createdAt: -1 });
+
+  res.status(200).json({ success: true, data: requests });
+});
+
+export const getCategories = asyncHandler(async (req, res) => {
+  const categories = await LeaveCategory.find({}).sort({ name: 1 });
+  res.status(200).json({ success: true, data: categories });
 });

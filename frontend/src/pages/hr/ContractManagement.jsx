@@ -125,15 +125,21 @@ export default function ContractManagement() {
         </div>
         
         <div className="banner-content">
-          <button 
-            className="btn" 
-            onClick={() => setIsCreateModalOpen(true)}
-            style={{ background: '#fff', color: 'var(--purple-700)', boxShadow: 'var(--shadow-md)', padding: '12px 24px', fontSize: 14 }}
-          >
-            <Icon name="plus" size={18} />
-            Assign New Contract
-          </button>
-        </div>
+  <button 
+    className="btn" 
+    onClick={() => setIsCreateModalOpen(true)}
+    style={{ 
+      background: 'rgb(255, 255, 255)', 
+      color: 'var(--blue-700)', 
+      boxShadow: 'var(--shadow-md)', 
+      padding: '12px 24px', 
+      fontSize: '14px' 
+    }}
+  >
+    <Icon name="plus" size={18} />
+    Assign New Contract
+  </button>
+</div>
       </header>
 
       {/* Expiring Contracts List */}

@@ -62,11 +62,15 @@ export default function Sidebar() {
   return (
     <aside className="sidebar">
       {/* Brand Header */}
-      <div className="sidebar-brand">
-        <div className="brand-logo">
-          <Icon name="layers" size={17} color="#fff"/>
-        </div>
-        <span className="brand-name">U-Prepare HRMS</span>
+      {/* Brand Header */}
+      <div className="sidebar-brand" style={{ gap: '12px' }}>
+        <img 
+          src="https://www.u-prepare.com/assets/img/updated-logo.png" 
+          alt="U-Prepare Logo" 
+          style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
+        />
+        {/* Note: If your image already includes the text "U-Prepare", you can delete the <span> below */}
+       
       </div>
 
       {/* Navigation Links */}

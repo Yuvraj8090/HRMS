@@ -1,15 +1,16 @@
 import React, { useState, useEffect } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { leaveAPI } from '../../services/api';
-import { Avatar, Badge, Spinner, fmtDate } from '../../components/common/index.jsx';
+import { Avatar, Badge, Spinner, fmtDate, Icon, Modal, EmptyState } from '../../components/common/index.jsx';
 
 export default function ManageLeaves() {
-  const { showToast } = useToast();
+  const toast = useToast();
   const [leaves, setLeaves] = useState([]);
   const [loading, setLoading] = useState(true);
   
   // Modal State
   const [selectedLeave, setSelectedLeave] = useState(null);
+  // Fixed state to use 'decision' and perfectly match backend expectations
   const [processingState, setProcessingState] = useState({ decision: 'Approved', remarks: '', approvalDoc: null });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -21,7 +22,7 @@ export default function ManageLeaves() {
       const response = await leaveAPI.getAllPending();
       setLeaves(response.data?.data || []);
     } catch (error) {
-      showToast('Failed to fetch pending leaves.', 'error');
+      toast.error('Failed to fetch pending leaves.');
     } finally {
       setLoading(false);
     }
@@ -32,24 +33,38 @@ export default function ManageLeaves() {
     setIsSubmitting(true);
     try {
       const formData = new FormData();
-      formData.append('decision', processingState.decision);
+      // Send 'decision' as the key to match backend: const { decision, remarks } = req.body;
+      formData.append('decision', processingState.decision); 
       formData.append('remarks', processingState.remarks);
-      if (processingState.approvalDoc) formData.append('approvalDoc', processingState.approvalDoc);
+      if (processingState.approvalDoc) {
+        formData.append('approvalDocument', processingState.approvalDoc);
+      }
 
       await leaveAPI.process(selectedLeave._id, formData);
-      showToast(`Leave ${processingState.decision.toLowerCase()} successfully.`, 'success');
-      setLeaves(leaves.filter(l => l._id !== selectedLeave._id));
-      setSelectedLeave(null);
+      toast.success(`Leave ${processingState.decision.toLowerCase()} successfully.`);
+      
+      setLeaves(prev => prev.filter(l => l._id !== selectedLeave._id));
+      closeModal();
     } catch (error) {
-      showToast(error.message || 'Failed to process leave.', 'error');
+      toast.error(error.message || 'Failed to process leave.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
+  const openModal = (leave) => {
+    setSelectedLeave(leave);
+    setProcessingState({ decision: 'Approved', remarks: '', approvalDoc: null });
+  };
+
+  const closeModal = () => {
+    setSelectedLeave(null);
+  };
+
   return (
-    <div className="dashboard-container animate-fade-in">
-      <header className="dashboard-banner">
+    <div style={{ animation: 'fadeIn 0.3s ease' }}>
+      
+      <header className="dashboard-banner mb-24">
         <div className="banner-decoration-top" />
         <div className="banner-decoration-bottom" />
         <div className="banner-content">
@@ -59,85 +74,123 @@ export default function ManageLeaves() {
         </div>
       </header>
 
-      <section className="mb-24">
-        <article className="card">
-          <header className="card-header">
-            <div>
-              <h2 className="section-title">Pending Approvals</h2>
-              <span className="section-subtitle">Review and process employee leaves</span>
+      <section className="card">
+        <header className="card-header">
+          <div>
+            <h2 className="section-title">Pending Approvals</h2>
+            <span className="section-subtitle">Review and process employee leaves</span>
+          </div>
+        </header>
+        
+        <div className="card-body" style={{ padding: 0 }}>
+          {loading ? (
+            <div className="flex-center p-32"><Spinner large /></div>
+          ) : leaves.length === 0 ? (
+            <div style={{ padding: '60px 20px' }}>
+              <EmptyState 
+                icon="🌴" 
+                title="Inbox Zero!" 
+                sub="There are no pending leave requests to process at this time."
+              />
             </div>
-          </header>
-          
-          <div className="card-body">
-            {loading ? (
-              <div className="flex-center p-32"><Spinner large /></div>
-            ) : leaves.length === 0 ? (
-              <p className="empty-state">No pending leave applications found.</p>
-            ) : (
-              <ul className="list-group">
-                {leaves.map(leave => (
-                  <li key={leave._id} className="list-item">
-                    <Avatar name={`${leave.employee?.user?.firstName} ${leave.employee?.user?.lastName}`} size={40} />
+          ) : (
+            <ul className="list-group">
+              {leaves.map(leave => {
+                const empName = `${leave.employee?.user?.firstName || ''} ${leave.employee?.user?.lastName || ''}`.trim();
+                return (
+                  <li key={leave._id} className="list-item" style={{ padding: '16px 20px' }}>
+                    <Avatar name={empName} size={42} />
                     <div className="list-item-content">
-                      <p className="item-title">{leave.employee?.user?.firstName} {leave.employee?.user?.lastName}</p>
-                      <p className="item-meta">
-                        {leave.leaveCategory?.name} · {leave.numberOfDays} Days · {fmtDate(leave.fromDate)} to {fmtDate(leave.toDate)}
+                      <p className="item-title" style={{ fontSize: 14 }}>{empName}</p>
+                      <p className="item-meta" style={{ marginTop: 4 }}>
+                        <strong style={{ color: 'var(--gray-700)' }}>{leave.leaveCategory?.name}</strong> · {leave.numberOfDays} Days · {fmtDate(leave.fromDate)} to {fmtDate(leave.toDate)}
                       </p>
+                      {leave.leaveLetterUrl && (
+                        <a 
+                          href={`${import.meta.env.VITE_API_URL?.replace('/api', '')}/${leave.leaveLetterUrl}`} 
+                          target="_blank" rel="noopener noreferrer"
+                          style={{ fontSize: 11, color: 'var(--blue-600)', display: 'inline-flex', alignItems: 'center', gap: 4, marginTop: 6 }}
+                        >
+                          <Icon name="file" size={12} /> View Attached Document
+                        </a>
+                      )}
                     </div>
-                    <div className="list-item-actions" style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-                      <Badge label={leave.status} />
-                      <button 
-                        onClick={() => setSelectedLeave(leave)}
-                        style={{ padding: '6px 12px', background: 'var(--blue-50)', color: 'var(--blue-600)', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer' }}
-                      >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      <Badge label={leave.status} className="badge-amber" />
+                      <button onClick={() => openModal(leave)} className="btn btn-secondary btn-sm">
                         Process
                       </button>
                     </div>
                   </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </article>
+                );
+              })}
+            </ul>
+          )}
+        </div>
       </section>
 
-      {/* Simplified Modal logic using standard HTML overlays since no Modal component was provided in common */}
+      {/* Process Leave Modal */}
       {selectedLeave && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <article className="card" style={{ width: '100%', maxWidth: '500px' }}>
-            <header className="card-header">
-              <div>
-                <h2 className="section-title">Process Leave</h2>
-                <span className="section-subtitle">{selectedLeave.employee?.user?.firstName}'s Request</span>
-              </div>
-            </header>
-            <div className="card-body" style={{ padding: '20px' }}>
-              <form onSubmit={handleProcessSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Decision</label>
-                  <select value={processingState.decision} onChange={e => setProcessingState(p => ({...p, decision: e.target.value}))} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--gray-300)' }}>
-                    <option value="Approved">Approve</option>
-                    <option value="Rejected">Reject</option>
-                  </select>
-                </div>
-                <div>
-                  <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>HR Remarks</label>
-                  <textarea required rows="3" value={processingState.remarks} onChange={e => setProcessingState(p => ({...p, remarks: e.target.value}))} style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '1px solid var(--gray-300)' }} />
-                </div>
-                {processingState.decision === 'Approved' && (
-                  <div>
-                    <label style={{ display: 'block', fontSize: '13px', fontWeight: 600, marginBottom: '6px' }}>Upload Approval Doc</label>
-                    <input type="file" onChange={e => setProcessingState(p => ({...p, approvalDoc: e.target.files[0]}))} style={{ width: '100%', padding: '8px', border: '1px dashed var(--gray-400)', borderRadius: '6px' }} />
-                  </div>
-                )}
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                  <button type="button" onClick={() => setSelectedLeave(null)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--gray-300)', background: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isSubmitting} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'var(--blue-600)', color: '#fff', cursor: 'pointer' }}>{isSubmitting ? 'Saving...' : 'Confirm'}</button>
-                </div>
-              </form>
+        <Modal 
+          title="Process Leave Request" 
+          onClose={!isSubmitting ? closeModal : undefined}
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={closeModal} disabled={isSubmitting}>Cancel</button>
+              <button type="submit" form="process-leave-form" className="btn btn-primary" disabled={isSubmitting || !processingState.remarks} style={{ minWidth: 120 }}>
+                {isSubmitting ? <Spinner /> : 'Confirm'}
+              </button>
+            </>
+          }
+        >
+          <div style={{ marginBottom: 20 }}>
+            <span className="section-subtitle">
+              Reviewing request for <strong>{selectedLeave.employee?.user?.firstName} {selectedLeave.employee?.user?.lastName}</strong>.
+            </span>
+            <div style={{ background: 'var(--gray-50)', padding: 12, borderRadius: 'var(--radius-md)', marginTop: 12, fontSize: 13, color: 'var(--gray-700)' }}>
+              <strong>Reason provided:</strong> {selectedLeave.reason}
             </div>
-          </article>
-        </div>
+          </div>
+
+          <form id="process-leave-form" onSubmit={handleProcessSubmit} style={{ paddingBottom: 10 }}>
+            
+            <div className="form-group">
+              <label className="form-label">Decision *</label>
+              <select 
+                className="form-control bg-white" 
+                value={processingState.decision} 
+                onChange={e => setProcessingState(p => ({ ...p, decision: e.target.value }))}
+              >
+                {/* Values are strictly capitalized now */}
+                <option value="Approved">Approve Request</option>
+                <option value="Rejected">Reject Request</option>
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">HR Remarks *</label>
+              <textarea 
+                required 
+                rows="3" 
+                className="form-control"
+                placeholder="Reason for approval or rejection..."
+                value={processingState.remarks} 
+                onChange={e => setProcessingState(p => ({ ...p, remarks: e.target.value }))} 
+              />
+            </div>
+
+            {processingState.decision === 'Approved' && (
+              <div className="form-group mb-0" style={{ marginTop: 16 }}>
+                <label className="form-label">Upload Approval Document (Optional)</label>
+                <input 
+                  type="file" 
+                  onChange={e => setProcessingState(p => ({ ...p, approvalDoc: e.target.files[0] }))} 
+                  style={{ fontSize: 13, color: 'var(--gray-600)', width: '100%', padding: '8px', border: '1px dashed var(--gray-400)', borderRadius: 'var(--radius-md)' }} 
+                />
+              </div>
+            )}
+          </form>
+        </Modal>
       )}
     </div>
   );
