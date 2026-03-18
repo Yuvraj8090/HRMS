@@ -5,42 +5,35 @@ import {
   flexRender,
 } from '@tanstack/react-table';
 
-import { Badge, Avatar, Icon, currency, Skeleton, EmptyState } from '../../../components/common/index.jsx';
+import { Badge, Avatar, Icon, currency, Skeleton, EmptyState, fmtDate } from '../../../components/common/index.jsx';
 
-export default function EmployeeTable({ 
+export default function AttendanceTable({ 
   data, 
   isLoading,
   pageCount,
   totalRecords,
   pagination,
   setPagination, 
-  sorting, 
-  setSorting, 
-  searchInput,
-  setSearchInput,
   filters,
-  setFilters,
-  departments,
-  designations,
-  onEdit 
+  setFilters
 }) {
   
   const columns = useMemo(() => [
     {
       header: 'Employee',
-      accessorKey: 'user.firstName',
+      accessorKey: 'employee.firstName',
       cell: ({ row }) => {
-        const emp = row.original;
-        const fullName = `${emp.user?.firstName || ''} ${emp.user?.lastName || ''}`.trim();
+        const record = row.original;
+        const fullName = `${record.employee?.firstName || ''} ${record.employee?.lastName || ''}`.trim();
         return (
           <div className="flex items-center gap-12">
             <Avatar name={fullName} size={36} />
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>
-                {fullName || 'Unknown'}
+                {fullName || 'Unknown Employee'}
               </div>
               <div style={{ fontSize: 11, color: 'var(--gray-400)' }} className="truncate">
-                {emp.user?.email}
+                {record.employee?.email || 'No email provided'}
               </div>
             </div>
           </div>
@@ -48,60 +41,60 @@ export default function EmployeeTable({
       }
     },
     {
-      header: 'Department & Unit',
-      accessorKey: 'department.name',
+      header: 'Report Period',
+      accessorKey: 'startDate',
       cell: ({ row }) => (
-        <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-800)' }}>
-            {row.original.department?.name || 'Unassigned'}
-          </div>
-          <div style={{ fontSize: 11, color: 'var(--blue-600)', fontFamily: 'monospace', marginTop: 2 }}>
-            {row.original.department?.code || 'N/A'}
-          </div>
+        <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-700)' }}>
+          {fmtDate(row.original.startDate)} <span style={{ color: 'var(--gray-400)', fontWeight: 400 }}>to</span> {fmtDate(row.original.endDate)}
         </div>
       )
     },
-    { 
-      header: 'Designation', 
-      accessorFn: row => row.designation?.title || 'N/A', 
-      id: 'designation',
-      cell: ({ getValue }) => <span style={{ fontSize: 13, color: 'var(--gray-700)' }}>{getValue()}</span>
-    },
-    { 
-      header: 'Salary', 
-      accessorKey: 'currentSalary', 
-      cell: ({ getValue }) => <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>{currency(getValue() || 0)}</span> 
+    {
+      header: 'Present',
+      accessorKey: 'presentDays',
+      cell: ({ getValue }) => <Badge label={`${getValue() || 0} Days`} className="badge-green" />
     },
     {
-      header: 'Status',
-      accessorKey: 'status',
-      cell: ({ getValue }) => <Badge label={getValue() || 'Active'} />
-    },
-    {
-      header: 'Actions',
-      id: 'actions',
+      header: 'Absent / Leave',
+      id: 'absentLeave',
       cell: ({ row }) => (
-        <button 
-          onClick={() => onEdit(row.original)} 
-          className="btn btn-secondary btn-sm"
-          title="Edit Employee"
-          style={{ padding: '6px 10px' }}
-        >
-          <Icon name="edit" size={16} />
-        </button>
+        <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+          <strong style={{ color: 'var(--red-600)' }}>{row.original.absentDays || 0}</strong> A / <strong style={{ color: 'var(--purple-600)' }}>{row.original.leaveDays || 0}</strong> L
+        </div>
+      )
+    },
+    {
+      header: 'Holidays / Offs',
+      id: 'holidaysOffs',
+      cell: ({ row }) => (
+        <div style={{ fontSize: 12, color: 'var(--gray-600)' }}>
+          <strong style={{ color: 'var(--blue-600)' }}>{row.original.holidays || 0}</strong> H / <strong style={{ color: 'var(--amber-600)' }}>{row.original.weeklyOffs || 0}</strong> WO
+        </div>
+      )
+    },
+    {
+      header: 'Overtime (OT)',
+      accessorKey: 'overtimeAmount',
+      cell: ({ row }) => (
+        <div style={{ textAlign: 'right' }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)' }}>
+            {row.original.overtimeHours || '0:00'} hrs
+          </div>
+          <div style={{ fontSize: 11, color: 'var(--gray-500)' }}>
+            {currency(row.original.overtimeAmount || 0)}
+          </div>
+        </div>
       )
     }
-  ], [onEdit]);
+  ], []);
 
   const table = useReactTable({
     data,
     columns,
-    state: { pagination, sorting },
+    state: { pagination },
     pageCount,
     onPaginationChange: setPagination,
-    onSortingChange: setSorting,
     manualPagination: true,
-    manualFiltering: true,
     getCoreRowModel: getCoreRowModel(),
   });
 
@@ -109,10 +102,17 @@ export default function EmployeeTable({
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
-  const hasActiveFilters = filters.department || filters.designation || filters.status;
+  const hasActiveFilters = filters.month || filters.year !== new Date().getFullYear().toString();
 
   const firstRow = totalRecords === 0 ? 0 : (pagination.pageIndex * pagination.pageSize) + 1;
   const lastRow = Math.min((pagination.pageIndex + 1) * pagination.pageSize, totalRecords);
+
+  const months = [
+    { value: '1', label: 'January' }, { value: '2', label: 'February' }, { value: '3', label: 'March' },
+    { value: '4', label: 'April' }, { value: '5', label: 'May' }, { value: '6', label: 'June' },
+    { value: '7', label: 'July' }, { value: '8', label: 'August' }, { value: '9', label: 'September' },
+    { value: '10', label: 'October' }, { value: '11', label: 'November' }, { value: '12', label: 'December' }
+  ];
 
   return (
     <div className="card">
@@ -120,65 +120,41 @@ export default function EmployeeTable({
       {/* Table Toolbar */}
       <div className="card-header flex items-center justify-between gap-16 flex-wrap">
         
-        {/* Left Side: Search & Filters */}
+        {/* Left Side: Filters */}
         <div className="flex flex-wrap items-center gap-12" style={{ flex: '1 1 auto' }}>
           
-          {/* Search */}
-          <div style={{ position: 'relative', width: 280 }}>
-            <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', display: 'flex' }}>
-              <Icon name="search" size={16} />
+          <div style={{ position: 'relative' }}>
+            <div style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', display: 'flex' }}>
+              <Icon name="calendar" size={14} />
             </div>
-            <input 
-              type="text"
-              className="form-control"
-              placeholder="Search by name, email..."
-              value={searchInput}
-              onChange={e => setSearchInput(e.target.value)}
-              style={{ paddingLeft: 38 }}
-            />
+            <select 
+              className="form-control" 
+              style={{ width: 'auto', minWidth: 140, padding: '9px 32px 9px 34px' }}
+              value={filters.month} 
+              onChange={e => handleFilterChange('month', e.target.value)}
+            >
+              <option value="">All Months</option>
+              {months.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
           </div>
 
-          {/* Department Filter */}
           <select 
             className="form-control" 
-            style={{ width: 'auto', minWidth: 160, padding: '9px 32px 9px 12px' }}
-            value={filters.department} 
-            onChange={e => handleFilterChange('department', e.target.value)}
+            style={{ width: 'auto', minWidth: 100, padding: '9px 32px 9px 12px' }}
+            value={filters.year} 
+            onChange={e => handleFilterChange('year', e.target.value)}
           >
-            <option value="">All Departments</option>
-            {departments?.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
-          </select>
-
-          {/* Designation Filter */}
-          <select 
-            className="form-control" 
-            style={{ width: 'auto', minWidth: 160, padding: '9px 32px 9px 12px' }}
-            value={filters.designation} 
-            onChange={e => handleFilterChange('designation', e.target.value)}
-          >
-            <option value="">All Designations</option>
-            {designations?.map(d => <option key={d._id} value={d._id}>{d.title}</option>)}
-          </select>
-
-          {/* Status Filter */}
-          <select 
-            className="form-control" 
-            style={{ width: 'auto', minWidth: 140, padding: '9px 32px 9px 12px' }}
-            value={filters.status} 
-            onChange={e => handleFilterChange('status', e.target.value)}
-          >
-            <option value="">All Statuses</option>
-            <option value="Active">Active</option>
-            <option value="On Leave">On Leave</option>
-            <option value="Resigned">Resigned</option>
-            <option value="Terminated">Terminated</option>
+            <option value="2024">2024</option>
+            <option value="2025">2025</option>
+            <option value="2026">2026</option>
+            <option value="2027">2027</option>
           </select>
 
           {/* Clear Filters Button */}
           {hasActiveFilters && (
             <button 
               className="btn btn-secondary btn-sm"
-              onClick={() => setFilters({ department: '', designation: '', status: '' })}
+              onClick={() => setFilters({ month: '', year: new Date().getFullYear().toString() })}
               style={{ padding: '8px 12px' }}
             >
               Clear Filters
@@ -195,7 +171,7 @@ export default function EmployeeTable({
             onChange={e => table.setPageSize(Number(e.target.value))}
             style={{ width: 'auto', padding: '6px 32px 6px 12px', fontSize: 13 }}
           >
-            {[10, 20, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
+            {[10, 25, 50, 100].map(size => <option key={size} value={size}>{size}</option>)}
           </select>
         </div>
       </div>
@@ -207,7 +183,7 @@ export default function EmployeeTable({
             {table.getHeaderGroups().map(group => (
               <tr key={group.id}>
                 {group.headers.map(header => (
-                  <th key={header.id}>
+                  <th key={header.id} style={{ textAlign: header.id === 'overtimeAmount' ? 'right' : header.id === 'absentLeave' || header.id === 'holidaysOffs' || header.id === 'presentDays' ? 'center' : 'left' }}>
                     {flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
                 ))}
@@ -228,28 +204,30 @@ export default function EmployeeTable({
                       </div>
                     </div>
                   </td>
-                  <td><Skeleton height={14} width="100px" /></td>
-                  <td><Skeleton height={14} width="140px" /></td>
-                  <td><Skeleton height={14} width="80px" /></td>
-                  <td><Skeleton height={20} width="60px" style={{ borderRadius: 10 }} /></td>
-                  <td><Skeleton height={28} width="36px" style={{ borderRadius: 6 }} /></td>
+                  <td><Skeleton height={14} width="160px" /></td>
+                  <td><Skeleton height={20} width="60px" style={{ borderRadius: 10, margin: '0 auto' }} /></td>
+                  <td><Skeleton height={14} width="80px" style={{ margin: '0 auto' }} /></td>
+                  <td><Skeleton height={14} width="80px" style={{ margin: '0 auto' }} /></td>
+                  <td>
+                    <div className="flex flex-col gap-4" style={{ alignItems: 'flex-end' }}>
+                      <Skeleton height={14} width="50px" />
+                      <Skeleton height={10} width="40px" />
+                    </div>
+                  </td>
                 </tr>
               ))
             ) : table.getRowModel().rows.length === 0 ? (
               // Empty State
               <tr>
-                <td colSpan={columns.length} style={{ padding: '48px 20px' }}>
+                <td colSpan={columns.length} style={{ padding: '60px 20px' }}>
                   <EmptyState 
-                    icon="🔍" 
-                    title="No personnel found" 
-                    sub="We couldn't find anyone matching your current filters and search."
+                    icon="📊" 
+                    title="No records found" 
+                    sub="No attendance summaries match the selected filters."
                     action={
-                      (searchInput || hasActiveFilters) && (
-                        <button className="btn btn-secondary btn-sm" onClick={() => {
-                          setSearchInput('');
-                          setFilters({ department: '', designation: '', status: '' });
-                        }}>
-                          Clear All Filters
+                      hasActiveFilters && (
+                        <button className="btn btn-secondary btn-sm" onClick={() => setFilters({ month: '', year: new Date().getFullYear().toString() })}>
+                          Clear Filters
                         </button>
                       )
                     }

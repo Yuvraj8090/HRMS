@@ -1,134 +1,172 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { attendanceAPI } from '../../services/api';
-import { Avatar, Badge, Spinner, fmtDate } from '../../components/common/index.jsx';
+import { Icon, Modal, Spinner, fmtDate } from '../../components/common/index.jsx';
+import AttendanceTable from './components/AttendanceTable';
 
 export default function AttendanceOverview() {
   const toast = useToast();
-  const [records, setRecords] = useState([]);
-  const [loading, setLoading] = useState(true);
   
+  // -- Domain Data State --
+  const [data, setData] = useState([]);
+  const [totalRecords, setTotalRecords] = useState(0);
+  const [pageCount, setPageCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  
+  // -- Interface & Pagination State --
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [filters, setFilters] = useState({ month: '', year: new Date().getFullYear().toString() });
+
+  // -- Modal State --
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [excelFile, setExcelFile] = useState(null);
   const [isImporting, setIsImporting] = useState(false);
+  const [importForm, setImportForm] = useState({ file: null, startDate: '', endDate: '' });
 
-  useEffect(() => { fetchTodayOverview(); }, []);
+  // Reset pagination when filters change
+  useEffect(() => {
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [filters.month, filters.year]);
 
-  const fetchTodayOverview = async () => {
+  // -- Infrastructure / Data Fetching --
+  const loadSummaries = useCallback(async () => {
+    setIsLoading(true);
     try {
-      setLoading(true);
-      const response = await attendanceAPI.getDailyOverview();
-      setRecords(response.data?.data || []);
-    } catch (error) {
-      // FIX: Updated to use the correct toast method
-      toast.error('Failed to fetch today\'s attendance.');
-    } finally {
-      setLoading(false);
-    }
-  };
+      const params = {
+        page: pagination.pageIndex + 1,
+        limit: pagination.pageSize,
+        month: filters.month || undefined,
+        year: filters.year || undefined,
+      };
 
+      const response = await attendanceAPI.getAllSummaries(params);
+      const payload = response.data;
+
+      if (payload.success) {
+        setData(payload.data || []);
+        setTotalRecords(payload.total || 0);
+        setPageCount(payload.pages || 0);
+      }
+    } catch (error) {
+      toast.error('Failed to fetch attendance summaries. Check network logs.');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [pagination.pageIndex, pagination.pageSize, filters, toast]);
+
+  useEffect(() => { loadSummaries(); }, [loadSummaries]);
+
+  // -- Handlers --
   const handleImportSubmit = async (e) => {
     e.preventDefault();
-    if (!excelFile) return toast.error('Please select a file first.'); // FIX applied here
+    if (!importForm.file) return toast.error('Please select an Excel/CSV file.');
+    if (!importForm.startDate || !importForm.endDate) return toast.error('Start Date and End Date are required.');
+    if (new Date(importForm.startDate) > new Date(importForm.endDate)) return toast.error('Start Date cannot be after End Date.');
 
     setIsImporting(true);
     try {
       const formData = new FormData();
-      formData.append('file', excelFile);
+      formData.append('file', importForm.file);
+      formData.append('startDate', importForm.startDate);
+      formData.append('endDate', importForm.endDate);
+
       await attendanceAPI.importExcel(formData);
       
-      // FIX: Updated to use toast.success
-      toast.success('Attendance imported successfully.');
+      toast.success('Attendance records imported successfully.');
       
-      setExcelFile(null);
+      setImportForm({ file: null, startDate: '', endDate: '' });
       setIsImportModalOpen(false);
-      fetchTodayOverview();
+      loadSummaries(); // Refresh table
     } catch (error) {
-      // FIX: Updated to use toast.error
-      toast.error(error.message || 'Failed to import attendance.');
+      toast.error(error.message || 'Failed to import attendance. Check file format.');
     } finally {
       setIsImporting(false);
     }
   };
 
   return (
-    <div className="dashboard-container animate-fade-in">
-      <header className="dashboard-banner" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingRight: '40px' }}>
+    <div style={{ animation: 'fadeIn 0.3s ease' }}>
+      
+      {/* Dashboard Banner */}
+      <header className="dashboard-banner flex items-center justify-between flex-wrap gap-16 mb-24">
         <div className="banner-decoration-top" />
         <div className="banner-decoration-bottom" />
+        
         <div className="banner-content">
           <p className="banner-subtitle">HR Operations</p>
-          <h1 className="banner-title">Daily Attendance</h1>
-          <p className="banner-date">{fmtDate(new Date())}</p>
+          <h1 className="banner-title">Monthly Attendance Summaries</h1>
+          <p className="banner-date">Manage payroll-ready attendance metrics stored in AttendanceSummary</p>
         </div>
-        <div style={{ zIndex: 10 }}>
+        
+        <div className="banner-content">
           <button 
+            className="btn" 
             onClick={() => setIsImportModalOpen(true)}
-            style={{ background: '#fff', color: 'var(--green-600)', padding: '10px 20px', borderRadius: '6px', fontWeight: 600, border: 'none', cursor: 'pointer', boxShadow: '0 4px 6px rgba(0,0,0,0.1)' }}
+            style={{ background: '#fff', color: 'var(--blue-700)', boxShadow: 'var(--shadow-md)', padding: '12px 24px', fontSize: 14 }}
           >
-            + Import Excel
+            <Icon name="upload" size={18} />
+            Bulk Import Excel
           </button>
         </div>
       </header>
 
-      <section className="mb-24">
-        <article className="card">
-          <header className="card-header">
-            <div>
-              <h2 className="section-title">Today's Roster</h2>
-              <span className="section-subtitle">Real-time clock-ins and outs</span>
-            </div>
-          </header>
-          
-          <div className="card-body">
-            {loading ? (
-              <div className="flex-center p-32"><Spinner large /></div>
-            ) : records.length === 0 ? (
-              <p className="empty-state">No attendance records for today.</p>
-            ) : (
-              <ul className="list-group">
-                {records.map(record => (
-                  <li key={record._id} className="list-item">
-                    <Avatar name={`${record.employee?.firstName} ${record.employee?.lastName}`} size={40} />
-                    <div className="list-item-content">
-                      <p className="item-title">{record.employee?.firstName} {record.employee?.lastName}</p>
-                      <p className="item-meta">
-                        In: {record.clockIn ? new Date(record.clockIn).toLocaleTimeString() : '--:--'} | 
-                        Out: {record.clockOut ? new Date(record.clockOut).toLocaleTimeString() : '--:--'}
-                      </p>
-                    </div>
-                    <div className="list-item-actions">
-                      <Badge label={record.status} style={{ background: record.status === 'Present' ? 'var(--green-50)' : 'var(--red-50)', color: record.status === 'Present' ? 'var(--green-600)' : 'var(--red-600)' }} />
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        </article>
-      </section>
+      {/* Presentational Table Component */}
+      <AttendanceTable 
+        data={data}
+        isLoading={isLoading}
+        pageCount={pageCount}
+        totalRecords={totalRecords}
+        pagination={pagination}
+        setPagination={setPagination}
+        filters={filters}
+        setFilters={setFilters}
+      />
 
-      {/* Import Modal */}
+      {/* Excel Import Modal */}
       {isImportModalOpen && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}>
-          <article className="card" style={{ width: '100%', maxWidth: '400px' }}>
-            <header className="card-header">
-              <div>
-                <h2 className="section-title">Bulk Import</h2>
-                <span className="section-subtitle">Upload .xlsx or .csv</span>
-              </div>
-            </header>
-            <div className="card-body" style={{ padding: '20px' }}>
-              <form onSubmit={handleImportSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                <input type="file" onChange={e => setExcelFile(e.target.files[0])} accept=".xlsx,.xls,.csv" style={{ width: '100%', padding: '20px', border: '2px dashed var(--gray-300)', borderRadius: '6px', textAlign: 'center' }} />
-                <div style={{ display: 'flex', gap: '10px', justifyContent: 'flex-end', marginTop: '10px' }}>
-                  <button type="button" onClick={() => setIsImportModalOpen(false)} style={{ padding: '8px 16px', borderRadius: '6px', border: '1px solid var(--gray-300)', background: '#fff', cursor: 'pointer' }}>Cancel</button>
-                  <button type="submit" disabled={isImporting || !excelFile} style={{ padding: '8px 16px', borderRadius: '6px', border: 'none', background: 'var(--green-600)', color: '#fff', cursor: 'pointer' }}>{isImporting ? 'Processing...' : 'Upload'}</button>
+        <Modal 
+          title="Import Monthly Attendance" 
+          onClose={() => !isImporting && setIsImportModalOpen(false)}
+          footer={
+            <>
+              <button type="button" className="btn btn-secondary" onClick={() => setIsImportModalOpen(false)} disabled={isImporting}>Cancel</button>
+              <button type="submit" form="attendance-import-form" className="btn btn-primary" disabled={isImporting || !importForm.file || !importForm.startDate || !importForm.endDate} style={{ minWidth: 120 }}>
+                {isImporting ? <Spinner /> : 'Upload & Process'}
+              </button>
+            </>
+          }
+        >
+          <form id="attendance-import-form" onSubmit={handleImportSubmit} style={{ padding: '10px 0' }}>
+            
+            <div style={{ marginBottom: 24 }}>
+              <span className="section-title" style={{ display: 'block', marginBottom: 16 }}>1. Select Reporting Period</span>
+              <div className="grid-2">
+                <div className="form-group mb-0">
+                  <label className="form-label">Start Date *</label>
+                  <input type="date" className="form-control" required value={importForm.startDate} onChange={e => setImportForm(prev => ({ ...prev, startDate: e.target.value }))} />
                 </div>
-              </form>
+                <div className="form-group mb-0">
+                  <label className="form-label">End Date *</label>
+                  <input type="date" className="form-control" required value={importForm.endDate} onChange={e => setImportForm(prev => ({ ...prev, endDate: e.target.value }))} />
+                </div>
+              </div>
             </div>
-          </article>
-        </div>
+
+            <div className="divider" />
+
+            <div>
+              <span className="section-title" style={{ display: 'block', marginBottom: 16 }}>2. Upload Roster File</span>
+              <div style={{ border: '2px dashed var(--gray-300)', borderRadius: 'var(--radius-lg)', padding: '30px 20px', textAlign: 'center', background: 'var(--gray-50)' }}>
+                <div style={{ display: 'inline-flex', background: 'var(--white)', padding: 12, borderRadius: '50%', boxShadow: 'var(--shadow-sm)', marginBottom: 12 }}>
+                  <Icon name="upload" size={24} color="var(--blue-500)" />
+                </div>
+                <h3 style={{ fontSize: 13, fontWeight: 700, color: 'var(--gray-800)', marginBottom: 6 }}>Select .xlsx or .csv file</h3>
+                <p style={{ fontSize: 12, color: 'var(--gray-500)', marginBottom: 16 }}>Ensure headers match the system template (Name, Present, Absent, etc.)</p>
+                <input type="file" accept=".xlsx,.xls,.csv" required onChange={e => setImportForm(prev => ({ ...prev, file: e.target.files[0] }))} style={{ fontSize: 12, color: 'var(--gray-600)', width: '100%', maxWidth: 220, margin: '0 auto' }} />
+              </div>
+            </div>
+
+          </form>
+        </Modal>
       )}
     </div>
   );

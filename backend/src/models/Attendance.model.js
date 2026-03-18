@@ -1,13 +1,13 @@
 /**
- * src/models/Attendance.model.js
+ * src/models/AttendanceSummary.model.js
  *
- * Tracks daily clock-in / clock-out records per employee.
- * Calculates total hours worked automatically via a virtual.
+ * Stores aggregated monthly attendance records uploaded via CSV/Excel.
+ * Used primarily for payroll processing rather than daily tracking.
  */
 
 import mongoose from 'mongoose';
 
-const attendanceSchema = new mongoose.Schema(
+const attendanceSummarySchema = new mongoose.Schema(
   {
     // ── Relations ──────────────────────────────────────────────────────────────
     employee: {
@@ -17,63 +17,81 @@ const attendanceSchema = new mongoose.Schema(
       index: true,
     },
 
-    // ── Time Tracking ──────────────────────────────────────────────────────────
-    date: {
+    // ── Report Period ──────────────────────────────────────────────────────────
+    // e.g., startDate: 2026-03-01, endDate: 2026-03-31
+    startDate: {
       type: Date,
-      required: [true, 'Attendance date is required.'],
+      required: [true, 'Report start date is required.'],
     },
-    clockIn: {
+    endDate: {
       type: Date,
-      required: [true, 'Clock-in time is required.'],
-    },
-    clockOut: {
-      type: Date,
-      default: null,
+      required: [true, 'Report end date is required.'],
     },
 
-    // ── Status & Notes ─────────────────────────────────────────────────────────
-    status: {
-      type: String,
-      enum: ['Present', 'Absent', 'Half-Day', 'Late', 'On Leave', 'Holiday'],
-      default: 'Present',
+    // ── Aggregated Metrics (Mapped to your CSV columns) ────────────────────────
+    presentDays: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
-    workMode: {
-      type: String,
-      enum: ['Office', 'Remote', 'Hybrid'],
-      default: 'Office',
+    absentDays: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
-    notes: {
-      type: String,
-      trim: true,
-      maxlength: [300, 'Notes cannot exceed 300 characters.'],
+    weeklyOffs: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    holidays: {
+      type: Number,
+      default: 0,
+      min: 0,
+    },
+    leaveDays: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
 
-    // ── Location (optional, for geo-attendance) ────────────────────────────────
-    clockInLocation: {
-      type: { type: String, enum: ['Point'], default: 'Point' },
-      coordinates: { type: [Number], default: [0, 0] }, // [lng, lat]
+    // ── Overtime ───────────────────────────────────────────────────────────────
+    overtimeHours: {
+      type: String, // Stored as string because your data uses "HH:MM" format (e.g., "1:50")
+      default: '0:00',
+    },
+    overtimeAmount: {
+      type: Number,
+      default: 0,
+      min: 0,
     },
   },
   {
     timestamps: true,
-    toJSON:   { virtuals: true },
-    toObject: { virtuals: true },
   }
 );
 
 // ── Indexes ────────────────────────────────────────────────────────────────────
-// Compound: one attendance record per employee per date
-attendanceSchema.index({ employee: 1, date: 1 }, { unique: true });
-attendanceSchema.index({ clockInLocation: '2dsphere' });
+// Compound Unique Index: Prevents uploading the same monthly report for the same employee twice.
+// If HR uploads the March report twice, it will update/fail instead of duplicating.
+attendanceSummarySchema.index({ employee: 1, startDate: 1, endDate: 1 }, { unique: true });
 
 // ── Virtuals ───────────────────────────────────────────────────────────────────
-
-/** Total hours worked (decimal) */
-attendanceSchema.virtual('hoursWorked').get(function () {
-  if (!this.clockIn || !this.clockOut) return null;
-  const diffMs = new Date(this.clockOut) - new Date(this.clockIn);
-  return parseFloat((diffMs / (1000 * 60 * 60)).toFixed(2));
+/** * Automatically calculates total payable days. 
+ * Usually: Present + Weekly Offs + Holidays + Paid Leaves
+ */
+attendanceSummarySchema.virtual('totalPayableDays').get(function () {
+  return (
+    this.presentDays + 
+    this.weeklyOffs + 
+    this.holidays + 
+    this.leaveDays
+  );
 });
 
-const Attendance = mongoose.model('Attendance', attendanceSchema);
-export default Attendance;
+// Ensure virtuals are included when converting to JSON
+attendanceSummarySchema.set('toJSON', { virtuals: true });
+attendanceSummarySchema.set('toObject', { virtuals: true });
+
+const AttendanceSummary = mongoose.model('AttendanceSummary', attendanceSummarySchema);
+export default AttendanceSummary;

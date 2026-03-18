@@ -23,30 +23,30 @@ export default function EmployeeList() {
   const [pageCount, setPageCount] = useState(0);
   const [isLoading, setIsLoading] = useState(true);
   
-  // -- Auxiliary Data State (for Form Dropdowns) --
+  // -- Auxiliary Data State (for Form Dropdowns & Filters) --
   const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   
-  // -- Interface / Pagination State --
+  // -- Interface / Pagination / Filter State --
   const [searchInput, setSearchInput] = useState('');
   const debouncedSearch = useDebounce(searchInput, 400);
   const [sorting, setSorting] = useState([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [filters, setFilters] = useState({ department: '', designation: '', status: '' });
 
   // -- Modal States --
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [formMode, setFormMode] = useState('create');
   const [formData, setFormData] = useState(INITIAL_FORM);
-  const [selectedUserId, setSelectedUserId] = useState(null); // CRITICAL FIX: Track User ID, not Profile ID
+  const [selectedUserId, setSelectedUserId] = useState(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  
   const [isImportOpen, setIsImportOpen] = useState(false);
   const [importFile, setImportFile] = useState(null);
 
-  // Reset pagination when search changes
+  // Reset pagination to page 1 whenever search OR any filter changes
   useEffect(() => {
     setPagination(prev => ({ ...prev, pageIndex: 0 }));
-  }, [debouncedSearch]);
+  }, [debouncedSearch, filters.department, filters.designation, filters.status]);
 
   // -- Infrastructure / Data Fetching --
   const loadDirectory = useCallback(async () => {
@@ -56,6 +56,9 @@ export default function EmployeeList() {
         page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
         search: debouncedSearch || undefined,
+        department: filters.department || undefined,
+        designation: filters.designation || undefined,
+        status: filters.status || undefined,
       };
 
       const [empRes, deptRes, desigRes] = await Promise.all([
@@ -77,7 +80,7 @@ export default function EmployeeList() {
     } finally {
       setIsLoading(false);
     }
-  }, [pagination.pageIndex, pagination.pageSize, debouncedSearch, toast]);
+  }, [pagination.pageIndex, pagination.pageSize, debouncedSearch, filters, toast]);
 
   useEffect(() => { loadDirectory(); }, [loadDirectory]);
 
@@ -91,12 +94,7 @@ export default function EmployeeList() {
 
   const handleEditClick = useCallback((employeeInfo) => {
     setFormMode('edit');
-    
-    // CRITICAL FIX: The backend route PUT /employees/:id expects the USER ID, not the Profile ID.
-    // Ensure we grab the nested user._id for the update payload.
     setSelectedUserId(employeeInfo.user?._id);
-    
-    // Map nested MongoDB structure to flat React Form structure
     setFormData({
       firstName: employeeInfo.user?.firstName || '',
       lastName: employeeInfo.user?.lastName || '',
@@ -116,7 +114,6 @@ export default function EmployeeList() {
       yearsOfExperience: employeeInfo.yearsOfExperience || '',
       status: employeeInfo.status || 'Active'
     });
-    
     setIsFormOpen(true);
   }, []);
 
@@ -128,12 +125,11 @@ export default function EmployeeList() {
         await employeeAPI.create(formData);
         toast.success('Employee profile created successfully.');
       } else {
-        // Use the extracted User ID for the update call
         await employeeAPI.update(selectedUserId, formData);
         toast.success('Employee profile updated successfully.');
       }
       setIsFormOpen(false);
-      loadDirectory(); // Refresh the table
+      loadDirectory(); 
     } catch (err) {
       toast.error(err.message || 'Failed to save employee profile.');
     } finally {
@@ -145,10 +141,8 @@ export default function EmployeeList() {
   const handleImportSubmit = async (e) => {
     e.preventDefault();
     if (!importFile) return toast.error('Please select a file first.');
-    
     const formDataObj = new FormData();
     formDataObj.append('file', importFile);
-
     setIsSubmitting(true);
     try {
       await employeeAPI.importAll(formDataObj);
@@ -169,7 +163,6 @@ export default function EmployeeList() {
       {/* Header Section */}
       <div className="flex items-center justify-between mb-24 flex-wrap gap-16">
         <div>
-          <h2 className="page-title">Staff Directory</h2>
           <p className="page-sub">Project: U-Prepare · {totalRecords} Total Personnel</p>
         </div>
         
@@ -197,6 +190,10 @@ export default function EmployeeList() {
         setSorting={setSorting}
         searchInput={searchInput}
         setSearchInput={setSearchInput}
+        filters={filters}
+        setFilters={setFilters}
+        departments={departments}
+        designations={designations}
         onEdit={handleEditClick}
       />
 

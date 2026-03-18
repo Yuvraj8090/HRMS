@@ -204,7 +204,6 @@ export default function ProjectsPage() {
     <div style={{ animation: 'fadeIn 0.3s ease' }}>
       <div className="flex justify-between items-start flex-wrap gap-16 mb-24">
         <div>
-          <h2 className="page-title">Projects</h2>
           <p className="page-sub">{projects.length} project{projects.length !== 1 ? 's' : ''} found</p>
         </div>
         {canManage && (

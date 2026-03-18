@@ -44,3 +44,35 @@ export const renewContract = asyncHandler(async (req, res, next) => {
 
   res.status(201).json({ success: true, data: newContract });
 });
+// 3. Create NEW Contract (For Fresh Employees)
+export const createNewContract = asyncHandler(async (req, res, next) => {
+  const { employeeId, startDate, endDate } = req.body;
+
+  if (!employeeId || !startDate || !endDate) {
+    return next(new AppError('Employee ID, Start Date, and End Date are required.', 400));
+  }
+
+  // Check if the employee already has an Active contract
+  const existingContract = await Contract.findOne({ 
+    employee: employeeId, 
+    status: 'Active' 
+  });
+
+  if (existingContract) {
+    return next(new AppError('This employee already has an Active contract. Please renew it instead.', 409));
+  }
+
+  // Handle uploaded contract document
+  const documentUrl = req.file ? `uploaded_path/contracts/${req.file.originalname}` : null;
+
+  const newContract = await Contract.create({
+    employee: employeeId,
+    contractDate: new Date(),
+    startDate: startDate,
+    endDate: endDate,
+    documentUrl,
+    status: 'Active'
+  });
+
+  res.status(201).json({ success: true, data: newContract });
+});

@@ -57,14 +57,19 @@ export const employeeAPI = {
 };
 
 export const attendanceAPI = {
-  clockIn:         (data)   => api.post('/attendance/clock-in', data),
-  clockOut:        ()       => api.put('/attendance/clock-out'),
-  getToday:        ()       => api.get('/attendance/today'),
-  getHistory:      (params) => api.get('/attendance/history', { params }),
-  getDailyOverview:()       => api.get('/attendance/overview'),
-  importExcel:     (formData) => api.post('/attendance/import', formData, {
+  // ── Daily Attendance (Portal Clock-in/out) ──
+  clockIn:          (data)     => api.post('/attendance/clock-in', data),
+  clockOut:         ()         => api.put('/attendance/clock-out'),
+  getToday:         ()         => api.get('/attendance/today'),
+  getHistory:       (params)   => api.get('/attendance/history', { params }),
+  getDailyOverview: ()         => api.get('/attendance/overview'),
+  
+  // ── Monthly Summaries (Excel Uploads & Payroll) ──
+  importExcel:      (formData) => api.post('/attendance/import', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
+  getAllSummaries:  (params)   => api.get('/attendance/summaries', { params }),
+  getMySummaries:   (params)   => api.get('/attendance/my-summaries', { params }),
 };
 
 export const leaveAPI = {
@@ -80,6 +85,10 @@ export const leaveAPI = {
 export const contractAPI = {
   getExpiring: () => api.get('/contracts/expiring'),
   renew: (id, formData) => api.post(`/contracts/${id}/renew`, formData, {
+    headers: { 'Content-Type': 'multipart/form-data' }
+  }),
+  // NEW: Create contract for fresh employee
+  create: (formData) => api.post('/contracts', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 };

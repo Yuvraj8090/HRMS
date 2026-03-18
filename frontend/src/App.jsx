@@ -1,24 +1,27 @@
-// src/App.jsx
 import { BrowserRouter, Routes, Route, Navigate, Outlet, useLocation } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ToastProvider } from './context/ToastContext';
 import AppLayout from './components/layout/AppLayout';
 import { PageSpinner } from './components/common/index.jsx';
-import LeaveApplication from './pages/employee/LeaveApplication';
-import ManageLeaves from './pages/hr/ManageLeaves';
-import ContractManagement from './pages/hr/ContractManagement';
 
 // ── Pages ──────────────────────────────────────────────────────────────────────
 import LoginPage from './pages/auth/LoginPage';
 import EmployeeDashboard from './pages/employee/EmployeeDashboard';
 import MyAttendance from './pages/employee/MyAttendance';
 import MyRequests from './pages/employee/MyRequests';
+import LeaveApplication from './pages/employee/LeaveApplication';
+
 import HRDashboard from './pages/hr/HRDashboard';
 import PendingRequests from './pages/hr/PendingRequests';
 import EmployeeList from './pages/hr/EmployeeList';
 import AttendanceOverview from './pages/hr/AttendanceOverview';
+import ManageLeaves from './pages/hr/ManageLeaves';
+import ContractManagement from './pages/hr/ContractManagement';
+
 import AdminDashboard from './pages/admin/AdminDashboard';
 import DepartmentsPage from './pages/admin/DepartmentsPage';
+import DesignationsPage from './pages/admin/DesignationsPage'; // <-- NEW IMPORT
+
 import ProjectsPage from './pages/shared/ProjectsPage';
 
 // ── Security Guards ────────────────────────────────────────────────────────────
@@ -100,24 +103,24 @@ export default function App() {
                 <Route path="admin" element={<RequireRole allowedRoles={['admin']} />}>
                   <Route path="dashboard" element={<AdminDashboard />} />
                   <Route path="departments" element={<DepartmentsPage />} />
+                  <Route path="designations" element={<DesignationsPage />} /> {/* <-- NEW ROUTE */}
                   <Route path="employees" element={<EmployeeList />} />
                   <Route path="attendance" element={<AttendanceOverview />} />
                   <Route path="requests" element={<PendingRequests />} />
                   <Route path="projects" element={<ProjectsPage />} />
                   <Route path="leaves" element={<ManageLeaves />} />
-<Route path="contracts" element={<ContractManagement />} />
+                  <Route path="contracts" element={<ContractManagement />} />
                 </Route>
 
                 {/* --- HR ROUTES --- */}
                 <Route path="hr" element={<RequireRole allowedRoles={['hr', 'admin']} />}>
                   <Route path="dashboard" element={<HRDashboard />} />
-                  
                   <Route path="employees" element={<EmployeeList />} />
                   <Route path="attendance" element={<AttendanceOverview />} />
                   <Route path="requests" element={<PendingRequests />} />
                   <Route path="projects" element={<ProjectsPage />} />
                   <Route path="leaves" element={<ManageLeaves />} />
-<Route path="contracts" element={<ContractManagement />} />
+                  <Route path="contracts" element={<ContractManagement />} />
                 </Route>
 
                 {/* --- EMPLOYEE ROUTES --- */}
@@ -135,8 +138,8 @@ export default function App() {
             {/* Fallbacks */}
             <Route path="/unauthorized" element={
               <div style={{ padding: 40, textAlign: 'center' }}>
-                <h2>Unauthorized Access</h2>
-                <p>Your account role does not have permission to view this page.</p>
+                <h2 style={{ fontFamily: 'var(--font-display)', color: 'var(--gray-900)' }}>Unauthorized Access</h2>
+                <p style={{ color: 'var(--gray-500)' }}>Your account role does not have permission to view this page.</p>
               </div>
             } />
             <Route path="*" element={<Navigate to="/" replace />} />

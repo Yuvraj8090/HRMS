@@ -6,42 +6,43 @@ import { Icon, Avatar } from '../common/index.jsx';
 const NAV = {
   Admin: [
     { section: 'Overview', items: [
-      { id: 'dashboard',   label: 'Dashboard',   icon: 'home' },
+      { id: 'dashboard',    label: 'Dashboard',    icon: 'home' },
     ]},
     { section: 'Management', items: [
-      { id: 'employees',   label: 'Employees',   icon: 'users' },
-      { id: 'projects',    label: 'Projects',    icon: 'briefcase' },
-      { id: 'departments', label: 'Departments', icon: 'building' },
-      { id: 'contracts',   label: 'Contracts',   icon: 'file' },
+      { id: 'employees',    label: 'Employees',    icon: 'users' },
+      { id: 'projects',     label: 'Projects',     icon: 'briefcase' },
+      { id: 'departments',  label: 'Departments',  icon: 'building' },
+      { id: 'designations', label: 'Designations', icon: 'award' }, // <-- NEW: Added Designations
+      { id: 'contracts',    label: 'Contracts',    icon: 'layers' },
     ]},
     { section: 'HR Ops', items: [
-      { id: 'requests',    label: 'Appraisals',  icon: 'trending' },
-      { id: 'attendance',  label: 'Attendance',  icon: 'clock' },
-      { id: 'leaves',      label: 'Manage Leaves', icon: 'calendar' },
+      { id: 'requests',     label: 'Appraisals',   icon: 'trending' },
+      { id: 'attendance',   label: 'Attendance',   icon: 'clock' },
+      { id: 'leaves',       label: 'Manage Leaves',icon: 'calendar' },
     ]},
   ],
   HR: [
     { section: 'Overview', items: [
-      { id: 'dashboard',   label: 'Dashboard',   icon: 'home' },
+      { id: 'dashboard',    label: 'Dashboard',    icon: 'home' },
     ]},
     { section: 'Management', items: [
-      { id: 'employees',   label: 'Employees',   icon: 'users' },
-      { id: 'projects',    label: 'Projects',    icon: 'briefcase' },
-      { id: 'contracts',   label: 'Contracts',   icon: 'file' },
+      { id: 'employees',    label: 'Employees',    icon: 'users' },
+      { id: 'projects',     label: 'Projects',     icon: 'briefcase' },
+      { id: 'contracts',    label: 'Contracts',    icon: 'layers' },
     ]},
     { section: 'HR Ops', items: [
-      { id: 'requests',    label: 'Appraisals',  icon: 'trending' },
-      { id: 'attendance',  label: 'Attendance',  icon: 'clock' },
-      { id: 'leaves',      label: 'Manage Leaves', icon: 'calendar' },
+      { id: 'requests',     label: 'Appraisals',   icon: 'trending' },
+      { id: 'attendance',   label: 'Attendance',   icon: 'clock' },
+      { id: 'leaves',       label: 'Manage Leaves',icon: 'calendar' },
     ]},
   ],
   Employee: [
     { section: 'My Workspace', items: [
-      { id: 'dashboard',   label: 'Dashboard',   icon: 'home' },
-      { id: 'attendance',  label: 'My Attendance',icon: 'clock' },
-      { id: 'projects',    label: 'My Projects',  icon: 'briefcase' },
-      { id: 'requests',    label: 'My Appraisals',icon: 'trending' },
-      { id: 'leaves/apply',label: 'Apply Leave',  icon: 'calendar' },
+      { id: 'dashboard',    label: 'Dashboard',    icon: 'home' },
+      { id: 'attendance',   label: 'My Attendance',icon: 'clock' },
+      { id: 'projects',     label: 'My Projects',  icon: 'briefcase' },
+      { id: 'requests',     label: 'My Appraisals',icon: 'trending' },
+      { id: 'leaves/apply', label: 'Apply Leave',  icon: 'calendar' },
     ]},
   ],
 };
