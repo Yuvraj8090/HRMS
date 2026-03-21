@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useToast } from '../../context/ToastContext';
 import { leaveAPI } from '../../services/api';
 import { Spinner, StatCard } from '../../components/common/index.jsx';
@@ -9,9 +9,10 @@ export default function LeaveApplication() {
   const [loading, setLoading] = useState(false);
   const [fetchingData, setFetchingData] = useState(true);
   
-  // Real data from DB
+  // Data from DB
   const [categories, setCategories] = useState([]);
   const [balances, setBalances] = useState([]);
+  const [requests, setRequests] = useState([]); // NEW: Store leave history
 
   const [formData, setFormData] = useState({
     leaveCategoryId: '', 
@@ -24,24 +25,38 @@ export default function LeaveApplication() {
     leaveLetter: null,
   });
 
-  // Fetch dynamic categories and balances on mount
+  // Consolidated data fetcher for mount and after-submit refreshes
+  const fetchDashboardData = async () => {
+    try {
+      const [catRes, balRes, reqRes] = await Promise.all([
+        leaveAPI.getCategories(),
+        leaveAPI.getMyBalances().catch(() => ({ data: { data: [] } })),
+        leaveAPI.getMyRequests().catch(() => ({ data: { data: [] } })) // Fetch History
+      ]);
+      setCategories(catRes.data?.data || []);
+      setBalances(balRes.data?.data || []);
+      setRequests(reqRes.data?.data || []);
+    } catch (err) {
+      toast.error('Failed to load leave dashboard data.');
+    } finally {
+      setFetchingData(false);
+    }
+  };
+
   useEffect(() => {
-    const initData = async () => {
-      try {
-        const [catRes, balRes] = await Promise.all([
-          leaveAPI.getCategories(),
-          leaveAPI.getMyBalances().catch(() => ({ data: { data: [] } }))
-        ]);
-        setCategories(catRes.data?.data || []);
-        setBalances(balRes.data?.data || []);
-      } catch (err) {
-        toast.error('Failed to load leave categories.');
-      } finally {
-        setFetchingData(false);
-      }
-    };
-    initData();
+    fetchDashboardData();
   }, [toast]);
+
+  // Derived Statistics from Request History
+  const stats = useMemo(() => {
+    return requests.reduce((acc, curr) => {
+      acc.total += 1;
+      if (curr.status === 'Approved') acc.approved += 1;
+      if (curr.status === 'Pending') acc.pending += 1;
+      if (curr.status === 'Rejected') acc.rejected += 1;
+      return acc;
+    }, { total: 0, approved: 0, pending: 0, rejected: 0 });
+  }, [requests]);
 
   // Auto-calculate days when dates change
   useEffect(() => {
@@ -92,14 +107,20 @@ export default function LeaveApplication() {
       const fileInput = document.getElementById('leaveLetterInput');
       if (fileInput) fileInput.value = '';
       
-      // Refresh balances
-      const balRes = await leaveAPI.getMyBalances();
-      setBalances(balRes.data?.data || []);
+      // Refresh ALL data (balances AND history table)
+      await fetchDashboardData();
     } catch (error) {
       toast.error(error.message || 'Failed to submit application.');
     } finally {
       setLoading(false);
     }
+  };
+
+  // Helper for status colors
+  const getStatusColor = (status) => {
+    if (status === 'Approved') return 'var(--green-600)';
+    if (status === 'Rejected') return 'var(--red-600)';
+    return 'var(--yellow-600)';
   };
 
   if (fetchingData) {
@@ -115,11 +136,11 @@ export default function LeaveApplication() {
         <div className="banner-content">
           <p className="banner-subtitle">Employee Workspace</p>
           <h1 className="banner-title">Leave Management</h1>
-          <p className="banner-date">Review your balances and submit time-off requests.</p>
+          <p className="banner-date">Review your balances, submit requests, and track approvals.</p>
         </div>
       </header>
 
-      <div className="grid-2">
+      <div className="grid-2 mb-24">
         {/* Left Column: Balances */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
           <h2 className="section-title">My Leave Balances ({new Date().getFullYear()})</h2>
@@ -220,6 +241,58 @@ export default function LeaveApplication() {
           </div>
         </article>
       </div>
+
+      {/* NEW: History and Statistics Section */}
+      <div className="card mt-24">
+        <header className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <h2 className="section-title">My Leave History</h2>
+            <span className="section-subtitle">Past and current applications</span>
+          </div>
+          <div style={{ display: 'flex', gap: '16px', fontSize: '14px' }}>
+            <span><strong>Total Applied:</strong> {stats.total}</span>
+            <span style={{ color: 'var(--green-600)' }}><strong>Approved:</strong> {stats.approved}</span>
+            <span style={{ color: 'var(--yellow-600)' }}><strong>Pending:</strong> {stats.pending}</span>
+            <span style={{ color: 'var(--red-600)' }}><strong>Rejected:</strong> {stats.rejected}</span>
+          </div>
+        </header>
+
+        <div className="table-responsive">
+          <table className="table w-100 text-left">
+            <thead>
+              <tr style={{ borderBottom: '2px solid var(--gray-200)' }}>
+                <th className="p-12">Date Applied</th>
+                <th className="p-12">Leave Type</th>
+                <th className="p-12">Duration</th>
+                <th className="p-12">Status</th>
+                <th className="p-12">Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.length === 0 ? (
+                <tr>
+                  <td colSpan="5" className="text-center p-24 text-muted">No leave applications found.</td>
+                </tr>
+              ) : (
+                requests.map(req => (
+                  <tr key={req._id} style={{ borderBottom: '1px solid var(--gray-100)' }}>
+                    <td className="p-12 text-sm">{new Date(req.createdAt).toLocaleDateString()}</td>
+                    <td className="p-12 text-sm font-medium">{req.leaveCategory?.name || 'N/A'}</td>
+                    <td className="p-12 text-sm">
+                      {new Date(req.fromDate).toLocaleDateString()} - {new Date(req.toDate).toLocaleDateString()} ({req.numberOfDays} days)
+                    </td>
+                    <td className="p-12 text-sm font-bold" style={{ color: getStatusColor(req.status) }}>
+                      {req.status}
+                    </td>
+                    <td className="p-12 text-sm text-muted">{req.remarks || '-'}</td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
     </div>
   );
 }
