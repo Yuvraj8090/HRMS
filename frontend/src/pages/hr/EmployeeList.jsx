@@ -1,149 +1,186 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import EmployeeTable from './components/EmployeeTable';
+import { useState, useEffect, useCallback } from 'react';
 import { employeeAPI, departmentAPI, designationAPI } from '../../services/api';
-import useDebounce from '../../hooks/useDebounce';
-// Assume these exist, or we will build them next
-// import BulkImportModal from './components/BulkImportModal';
-// import EmployeeFormModal from './components/EmployeeFormModal';
+import { useToast } from '../../context/ToastContext';
+import { Icon } from '../../components/common/index.jsx';
+import { useDebounce } from '../../hooks/useDebounce';
+import EmployeeTable from './components/EmployeeTable';
+import EmployeeFormModal from './components/EmployeeFormModal';
+import BulkImportModal from './components/BulkImportModal';
+
+const INITIAL_FORM = {
+  firstName: '', lastName: '', email: '', phone: '', gender: 'Male', 
+  dateOfBirth: '', employeeId: '', department: '', designation: '', 
+  employmentType: 'Full-Time', currentSalary: '', joiningDate: '', 
+  project: '', officeLocation: '', education: '', yearsOfExperience: '', status: 'Active'
+};
 
 export default function EmployeeList() {
-  // ─── Data State ─────────────────────────────────────────────────────────────
-  const [employees, setEmployees] = useState([]);
-  const [designations, setDesignations] = useState([]);
+  const toast = useToast();
   
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-  
-  // ─── Table & Pagination State ───────────────────────────────────────────────
+  // -- Domain Data State --
+  const [data, setData] = useState([]);
   const [totalRecords, setTotalRecords] = useState(0);
   const [pageCount, setPageCount] = useState(0);
-  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
-  const [sorting, setSorting] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   
-  // ─── Filter & Search State ──────────────────────────────────────────────────
+  // -- Auxiliary Data State (for Form Dropdowns & Filters) --
+  const [departments, setDepartments] = useState([]);
+  const [designations, setDesignations] = useState([]);
+  
+  // -- Interface / Pagination / Filter State --
   const [searchInput, setSearchInput] = useState('');
-  const debouncedSearch = useDebounce(searchInput, 500);
-  
-  const [filters, setFilters] = useState({
-    department: '',
-    designation: '',
-    status: ''
-  });
+  const debouncedSearch = useDebounce(searchInput, 400);
+  const [sorting, setSorting] = useState([]);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [filters, setFilters] = useState({ department: '', designation: '', status: '' });
 
-  // ─── Modal States ───────────────────────────────────────────────────────────
-  const [isImportModalOpen, setIsImportModalOpen] = useState(false);
-  const [isFormModalOpen, setIsFormModalOpen] = useState(false);
-  const [selectedEmployee, setSelectedEmployee] = useState(null);
+  // -- Modal States --
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [formMode, setFormMode] = useState('create');
+  const [formData, setFormData] = useState(INITIAL_FORM);
+  const [selectedUserId, setSelectedUserId] = useState(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isImportOpen, setIsImportOpen] = useState(false);
+  const [importFile, setImportFile] = useState(null);
 
-  // ─── Fetch Master Data (Dropdowns) ──────────────────────────────────────────
+  // Reset pagination to page 1 whenever search OR any filter changes
   useEffect(() => {
-    const fetchMasters = async () => {
-      try {
-        const [deptRes, desigRes] = await Promise.all([
-          departmentAPI.getAll(),
-          designationAPI.getAll()
-        ]);
-        setDepartments(deptRes.data.data || []);
-        setDesignations(desigRes.data.data || []);
-      } catch (err) {
-        console.error('Failed to load master data', err);
-      }
-    };
-    fetchMasters();
-  }, []);
+    setPagination(prev => ({ ...prev, pageIndex: 0 }));
+  }, [debouncedSearch, filters.department, filters.designation, filters.status]);
 
-  // ─── Fetch Employee Data ────────────────────────────────────────────────────
-  const fetchEmployees = useCallback(async () => {
+  // -- Infrastructure / Data Fetching --
+  const loadDirectory = useCallback(async () => {
     setIsLoading(true);
-    setError(null);
     try {
-      // Build query params based on your backend API contract
       const params = {
-        page: pagination.pageIndex + 1, // React table is 0-indexed, API is 1-indexed
+        page: pagination.pageIndex + 1,
         limit: pagination.pageSize,
-        search: debouncedSearch,
-        department: filters.department,
-        status: filters.status,
-        // Add sorting if your backend supports it
-        ...(sorting.length > 0 && { 
-          sortBy: sorting[0].id, 
-          sortDesc: sorting[0].desc 
-        })
+        search: debouncedSearch || undefined,
+        department: filters.department || undefined,
+        designation: filters.designation || undefined,
+        status: filters.status || undefined,
       };
 
-      const response = await employeeAPI.getAll(params);
-      
-      setEmployees(response.data.data);
-      setTotalRecords(response.data.total);
-      setPageCount(response.data.pages);
+      const [empRes, deptRes, desigRes] = await Promise.all([
+        employeeAPI.getAll(params),
+        departmentAPI.getAll().catch(() => ({ data: { data: [] } })),
+        designationAPI.getAll().catch(() => ({ data: { data: [] } }))
+      ]);
+
+      if (empRes.data?.success) {
+        setData(empRes.data.data || []);
+        setTotalRecords(empRes.data.total || 0);
+        setPageCount(empRes.data.pages || 0);
+      }
+      if (deptRes.data?.success) setDepartments(deptRes.data.data);
+      if (desigRes.data?.success) setDesignations(desigRes.data.data);
+
     } catch (err) {
-      setError(err.message || 'Failed to fetch employees');
-      // In a real app, integrate your ToastContext here
+      toast.error('Failed to synchronize directory. Please check network logs.');
     } finally {
       setIsLoading(false);
     }
-  }, [pagination, debouncedSearch, filters, sorting]);
+  }, [pagination.pageIndex, pagination.pageSize, debouncedSearch, filters, toast]);
 
-  // Trigger fetch when dependencies change
-  useEffect(() => {
-    fetchEmployees();
-  }, [fetchEmployees]);
+  useEffect(() => { loadDirectory(); }, [loadDirectory]);
 
-  // Reset to page 0 if filters or search change
-  useEffect(() => {
-    setPagination(prev => ({ ...prev, pageIndex: 0 }));
-  }, [debouncedSearch, filters]);
-
-  // ─── Handlers ───────────────────────────────────────────────────────────────
-  const handleEdit = (employee) => {
-    setSelectedEmployee(employee);
-    setIsFormModalOpen(true);
+  // -- Handlers: Form Modal --
+  const handleOpenCreate = () => {
+    setFormMode('create');
+    setFormData(INITIAL_FORM);
+    setSelectedUserId(null);
+    setIsFormOpen(true);
   };
 
-  const handleAddNew = () => {
-    setSelectedEmployee(null);
-    setIsFormModalOpen(true);
+  const handleEditClick = useCallback((employeeInfo) => {
+    setFormMode('edit');
+    setSelectedUserId(employeeInfo.user?._id);
+    setFormData({
+      firstName: employeeInfo.user?.firstName || '',
+      lastName: employeeInfo.user?.lastName || '',
+      email: employeeInfo.user?.email || '',
+      phone: employeeInfo.user?.phone || '',
+      gender: employeeInfo.gender || 'Male',
+      dateOfBirth: employeeInfo.dateOfBirth || '',
+      employeeId: employeeInfo.employeeId || '',
+      department: employeeInfo.department?._id || '',
+      designation: employeeInfo.designation?._id || '',
+      employmentType: employeeInfo.employmentType || 'Full-Time',
+      currentSalary: employeeInfo.currentSalary || '',
+      joiningDate: employeeInfo.joiningDate || '',
+      project: employeeInfo.project || '',
+      officeLocation: employeeInfo.officeLocation || '',
+      education: employeeInfo.education || '',
+      yearsOfExperience: employeeInfo.yearsOfExperience || '',
+      status: employeeInfo.status || 'Active'
+    });
+    setIsFormOpen(true);
+  }, []);
+
+  const handleFormSubmit = async (e) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    try {
+      if (formMode === 'create') {
+        await employeeAPI.create(formData);
+        toast.success('Employee profile created successfully.');
+      } else {
+        await employeeAPI.update(selectedUserId, formData);
+        toast.success('Employee profile updated successfully.');
+      }
+      setIsFormOpen(false);
+      loadDirectory(); 
+    } catch (err) {
+      toast.error(err.message || 'Failed to save employee profile.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // -- Handlers: Import Modal --
+  const handleImportSubmit = async (e) => {
+    e.preventDefault();
+    if (!importFile) return toast.error('Please select a file first.');
+    const formDataObj = new FormData();
+    formDataObj.append('file', importFile);
+    setIsSubmitting(true);
+    try {
+      await employeeAPI.importAll(formDataObj);
+      toast.success('Roster imported successfully.');
+      setIsImportOpen(false);
+      setImportFile(null);
+      loadDirectory(); 
+    } catch (err) {
+      toast.error(err.message || 'Import failed. Please check the file format.');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
-    <div className="page-container p-6">
-      {/* Header Area */}
-      <div className="flex justify-between items-center mb-6">
+    <div style={{ animation: 'fadeIn 0.3s ease' }}>
+      
+      {/* Header Section */}
+      <div className="flex items-center justify-between mb-24 flex-wrap gap-16">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900">Personnel Roster</h1>
-          <p className="text-sm text-gray-500 mt-1">
-            Manage contractual staff, view statuses, and handle U-Prepare project assignments.
-          </p>
+          <p className="page-sub">Project: U-Prepare · {totalRecords} Total Personnel</p>
         </div>
         
-        <div className="flex gap-4">
-          <button 
-            className="btn btn-secondary flex items-center gap-2 border border-gray-300 px-4 py-2 rounded shadow-sm hover:bg-gray-50"
-            onClick={() => setIsImportModalOpen(true)}
-          >
-            {/* Insert your Icon component here */}
-            <span>Bulk Import (Excel)</span>
+        <div className="flex items-center gap-12">
+          <button className="btn btn-secondary" onClick={() => setIsImportOpen(true)}>
+            <Icon name="upload" size={16} />
+            <span>Bulk Import</span>
           </button>
-          
-          <button 
-            className="btn btn-primary flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded shadow-sm hover:bg-blue-700"
-            onClick={handleAddNew}
-          >
-            <span>+ Add Employee</span>
+          <button className="btn btn-primary" onClick={handleOpenCreate}>
+            <Icon name="plus" size={16} />
+            <span>Add Employee</span>
           </button>
         </div>
       </div>
 
-      {/* Error State */}
-      {error && (
-        <div className="bg-red-50 text-red-700 p-4 rounded mb-6 border border-red-200">
-          {error}
-        </div>
-      )}
-
-      {/* Table Component */}
+      {/* Presentational Table Component */}
       <EmployeeTable 
-        data={employees}
+        data={data} 
         isLoading={isLoading}
         pageCount={pageCount}
         totalRecords={totalRecords}
@@ -157,22 +194,31 @@ export default function EmployeeList() {
         setFilters={setFilters}
         departments={departments}
         designations={designations}
-        onEdit={handleEdit}
+        onEdit={handleEditClick}
       />
 
-      {/* Modals (Placeholders for next step) */}
-      {/* <BulkImportModal 
-        isOpen={isImportModalOpen} 
-        onClose={() => setIsImportModalOpen(false)} 
-        onSuccess={fetchEmployees}
-      />
+      {/* Modals */}
       <EmployeeFormModal 
-        isOpen={isFormModalOpen} 
-        employee={selectedEmployee} 
-        onClose={() => setIsFormModalOpen(false)} 
-        onSuccess={fetchEmployees}
-      /> 
-      */}
+        isOpen={isFormOpen}
+        onClose={() => setIsFormOpen(false)}
+        mode={formMode}
+        formData={formData}
+        setFormData={setFormData}
+        departments={departments}
+        designations={designations}
+        onSubmit={handleFormSubmit}
+        isSubmitting={isSubmitting}
+      />
+
+      <BulkImportModal 
+        isOpen={isImportOpen}
+        onClose={() => setIsImportOpen(false)}
+        onSubmit={handleImportSubmit}
+        onFileChange={(e) => setImportFile(e.target.files[0])}
+        isSubmitting={isSubmitting}
+        file={importFile}
+      />
+
     </div>
   );
 }
