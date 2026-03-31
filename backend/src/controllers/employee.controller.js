@@ -3,6 +3,7 @@ import User from '../models/User.model.js';
 import EmployeeProfile from '../models/EmployeeProfile.model.js';
 import Department from '../models/Department.model.js';
 import Designation from '../models/Designation.model.js';
+import Contract from '../models/Contract.model.js'; 
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 import { parseExcelToJSON } from '../utils/excelParser.js';
@@ -34,7 +35,6 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
         const desigName = String(row['Designation'] || 'Staff').trim();
         const salaryRaw = row['Present Salary'];
 
-        // --- 1. Robust Department Logic ---
         const generatedCode = deptName
           .replace(/[^a-zA-Z0-9]/g, '')
           .substring(0, 6)
@@ -46,14 +46,12 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
           { upsert: true, new: true, lean: true }
         );
 
-        // --- 2. Resolve Designation ---
         const designation = await Designation.findOneAndUpdate(
           { title: desigName, department: dept._id },
           { title: desigName, department: dept._id },
           { upsert: true, new: true, lean: true }
         );
 
-        // --- 3. UPSERT User ---
         const userData = {
           firstName: name.split(' ')[0],
           lastName: name.split(' ').slice(1).join(' ') || 'Employee',
@@ -66,7 +64,6 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
           { upsert: true, new: true }
         );
 
-        // --- 4. UPSERT Profile ---
         const cleanSalary = typeof salaryRaw === 'number' 
           ? salaryRaw 
           : parseFloat(String(salaryRaw || '0').replace(/[^0-9.]/g, '')) || 0;
@@ -122,7 +119,7 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
   });
 });
 
-// ── GET all employees ────────────────────────────────────────────────────────
+// ── GET all employees (WITH CONTRACT INTELLIGENCE) ───────────────────────────
 export const getAllEmployees = asyncHandler(async (req, res) => {
   const { search, department, status, page = 1, limit = 20 } = req.query;
   const skip = (Number(page) - 1) * Number(limit);
@@ -142,7 +139,7 @@ export const getAllEmployees = asyncHandler(async (req, res) => {
 
   const total = await EmployeeProfile.countDocuments(profileFilter);
   const profiles = await EmployeeProfile.find(profileFilter)
-    .populate('user', 'firstName lastName email role lastLogin isActive') // <-- Added isActive to population
+    .populate('user', 'firstName lastName email role lastLogin isActive')
     .populate('department', 'name code')
     .populate('designation', 'title level')
     .sort({ createdAt: -1 })
@@ -150,12 +147,83 @@ export const getAllEmployees = asyncHandler(async (req, res) => {
     .limit(Number(limit))
     .lean();
 
+  // --- Contract Intelligence Logic ---
+  const profileIds = profiles.map(p => p._id);
+  
+  const contracts = await Contract.find({ employee: { $in: profileIds } })
+    .sort({ endDate: -1 }) 
+    .lean();
+
+  const contractMap = {};
+  for (const c of contracts) {
+    const empIdStr = c.employee.toString();
+    if (!contractMap[empIdStr]) {
+      contractMap[empIdStr] = c;
+    }
+  }
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+
+  const enrichedProfiles = profiles.map(profile => {
+    const contract = contractMap[profile._id.toString()];
+    
+    let contractInfo = {
+      hasContract: false,
+      status: 'No Contract',
+      isDocumentUploaded: false,
+      daysToExpiry: null,
+      daysExpired: null,
+      endDate: null,
+      expiryText: null // <-- NEW: Ready-to-use display text
+    };
+
+    if (contract) {
+      contractInfo.hasContract = true;
+      contractInfo.isDocumentUploaded = !!contract.documentUrl;
+      contractInfo.endDate = contract.endDate;
+
+      const endDate = new Date(contract.endDate);
+      const endDay = new Date(endDate.getFullYear(), endDate.getMonth(), endDate.getDate());
+      
+      const diffTime = endDay.getTime() - today.getTime();
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 0) {
+        // Contract has expired
+        const absExpired = Math.abs(diffDays);
+        contractInfo.status = 'Expired';
+        contractInfo.daysExpired = absExpired;
+        contractInfo.expiryText = absExpired === 1 ? 'Expired 1 day ago' : `Expired ${absExpired} days ago`;
+      } else if (diffDays === 0) {
+        // Contract expires today
+        contractInfo.status = 'Expiring Soon';
+        contractInfo.daysToExpiry = 0;
+        contractInfo.expiryText = 'Expires Today';
+      } else {
+        // Contract is active or expiring soon
+        contractInfo.status = diffDays <= 30 ? 'Expiring Soon' : 'Active';
+        contractInfo.daysToExpiry = diffDays;
+        contractInfo.expiryText = diffDays === 1 ? 'Expires in 1 day' : `Expires in ${diffDays} days`;
+      }
+
+      if (contract.status === 'Pending Renewal') {
+        contractInfo.status = 'Pending Renewal';
+      }
+    }
+
+    return {
+      ...profile,
+      contractData: contractInfo 
+    };
+  });
+
   res.status(200).json({
     success: true,
     total,
     page: Number(page),
     pages: Math.ceil(total / Number(limit)),
-    data: profiles,
+    data: enrichedProfiles,
   });
 });
 
@@ -224,20 +292,16 @@ export const toggleEmployeeStatus = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    // 1. Fetch current user to determine current state
     const currentUser = await User.findById(req.params.id).session(session);
     
     if (!currentUser) {
       throw new AppError('User not found', 404);
     }
 
-    // 2. Determine new state (Toggle logic)
-    // If undefined or true, treat as currently active.
     const isCurrentlyActive = currentUser.isActive !== false; 
     const newActiveState = !isCurrentlyActive;
     const newProfileStatus = newActiveState ? 'Active' : 'Terminated';
 
-    // 3. Apply updates to both collections safely
     await User.findByIdAndUpdate(
       req.params.id, 
       { isActive: newActiveState }, 
@@ -268,5 +332,4 @@ export const toggleEmployeeStatus = asyncHandler(async (req, res, next) => {
   }
 });
 
-// Exporting with the old name so your existing router doesn't break
 export const deactivateEmployee = toggleEmployeeStatus;

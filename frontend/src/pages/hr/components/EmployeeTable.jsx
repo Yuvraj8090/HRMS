@@ -23,7 +23,7 @@ export default function EmployeeTable({
   departments,
   designations,
   onEdit,
-  onDeactivate // This prop name is fine, it now acts as a generic "Toggle" handler passed from parent
+  onDeactivate 
 }) {
   
   const columns = useMemo(() => [
@@ -37,11 +37,13 @@ export default function EmployeeTable({
           <div className="flex items-center gap-12">
             <Avatar name={fullName} size={36} />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-900)' }}>
-                {fullName || 'Unknown'}
-              </div>
-              <div style={{ fontSize: 11, color: 'var(--gray-400)' }} className="truncate">
-                {emp.user?.email}
+              <div className="flex flex-col">
+                <span className="text-sm font-medium text-gray-900">
+                  {fullName || 'Unknown'}
+                </span>
+                <span className="text-xs text-gray-500 truncate">
+                  {emp.user?.email}
+                </span>
               </div>
             </div>
           </div>
@@ -68,17 +70,49 @@ export default function EmployeeTable({
       id: 'designation',
       cell: ({ getValue }) => <span style={{ fontSize: 13, color: 'var(--gray-700)' }}>{getValue()}</span>
     },
-    { 
-      header: 'Salary', 
-      accessorKey: 'currentSalary', 
-      cell: ({ getValue }) => <span style={{ fontSize: 13, fontWeight: 600, color: 'var(--gray-700)' }}>{currency(getValue() || 0)}</span> 
+    {
+      header: 'Contract Status',
+      id: 'contract',
+      cell: ({ row }) => {
+        const contract = row.original.contractData;
+        
+        if (!contract || !contract.hasContract) {
+          return <span style={{ fontSize: 12, color: 'var(--gray-400)', fontStyle: 'italic' }}>No Contract</span>;
+        }
+
+        let badgeType = 'neutral';
+        if (contract.status === 'Active') {
+          badgeType = 'success';
+        } else if (contract.status === 'Expiring Soon') {
+          badgeType = 'warning';
+        } else if (contract.status === 'Expired') {
+          badgeType = 'error';
+        }
+
+        return (
+          <div>
+            <Badge label={contract.status} type={badgeType} />
+            {contract.expiryText && (
+              <div style={{ fontSize: 11, color: 'var(--gray-500)', marginTop: 4 }}>
+                {contract.expiryText}
+              </div>
+            )}
+            {!contract.isDocumentUploaded && contract.status !== 'No Contract' && (
+              <div style={{ fontSize: 11, color: 'var(--red-500)', marginTop: 2, display: 'flex', alignItems: 'center', gap: 4 }}>
+                <Icon name="alert-circle" size={12} /> Missing Doc
+              </div>
+            )}
+          </div>
+        );
+      }
     },
     {
-      header: 'Status',
+      header: 'Profile Status',
       accessorKey: 'status',
       cell: ({ getValue }) => {
         const status = getValue() || 'Active';
-        return <Badge label={status} />;
+        const type = status === 'Active' ? 'success' : status === 'Terminated' ? 'error' : 'neutral';
+        return <Badge label={status} type={type} />;
       }
     },
     {
@@ -86,8 +120,6 @@ export default function EmployeeTable({
       id: 'actions',
       cell: ({ row }) => {
         const emp = row.original;
-        // Determine if currently active based on User flag or Profile status
-        // Adjust this logic if your backend relies purely on emp.status === 'Active'
         const isActive = emp.status !== 'Terminated' && emp.status !== 'Resigned'; 
 
         return (
@@ -102,7 +134,6 @@ export default function EmployeeTable({
             </button>
 
             {isActive ? (
-              // DEACTIVATE BUTTON (Red)
               <button 
                 onClick={() => {
                   if (window.confirm(`Are you sure you want to DEACTIVATE ${emp.user?.firstName || 'this employee'}?`)) {
@@ -116,18 +147,30 @@ export default function EmployeeTable({
                 <Icon name="trash" size={16} />
               </button>
             ) : (
-              // ACTIVATE BUTTON (Green)
               <button 
                 onClick={() => {
                   if (window.confirm(`Are you sure you want to RE-ACTIVATE ${emp.user?.firstName || 'this employee'}?`)) {
                     onDeactivate(emp);
                   }
                 }} 
-                className="btn btn-secondary btn-sm"
+                className="btn btn-secondary btn-sm bg-green-100 flex items-center justify-center"
                 title="Activate Employee"
                 style={{ padding: '6px 10px', color: 'var(--green-600)', borderColor: 'var(--green-200)' }}
               >
-                <Icon name="check-circle" size={16} /> 
+                <svg 
+                  xmlns="http://www.w3.org/2000/svg" 
+                  width="16" 
+                  height="16" 
+                  viewBox="0 0 24 24" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  strokeWidth="2" 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round"
+                >
+                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
+                  <polyline points="22 4 12 14.01 9 11.01"></polyline>
+                </svg>
               </button>
             )}
           </div>
@@ -160,13 +203,10 @@ export default function EmployeeTable({
   return (
     <div className="card">
       
-      {/* Table Toolbar */}
       <div className="card-header flex items-center justify-between gap-16 flex-wrap">
         
-        {/* Left Side: Search & Filters */}
         <div className="flex flex-wrap items-center gap-12" style={{ flex: '1 1 auto' }}>
           
-          {/* Search */}
           <div style={{ position: 'relative', width: 280 }}>
             <div style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', color: 'var(--gray-400)', display: 'flex' }}>
               <Icon name="search" size={16} />
@@ -181,7 +221,6 @@ export default function EmployeeTable({
             />
           </div>
 
-          {/* Department Filter */}
           <select 
             className="form-control" 
             style={{ width: 'auto', minWidth: 160, padding: '9px 32px 9px 12px' }}
@@ -192,7 +231,6 @@ export default function EmployeeTable({
             {departments?.map(d => <option key={d._id} value={d._id}>{d.name}</option>)}
           </select>
 
-          {/* Designation Filter */}
           <select 
             className="form-control" 
             style={{ width: 'auto', minWidth: 160, padding: '9px 32px 9px 12px' }}
@@ -203,7 +241,6 @@ export default function EmployeeTable({
             {designations?.map(d => <option key={d._id} value={d._id}>{d.title}</option>)}
           </select>
 
-          {/* Status Filter */}
           <select 
             className="form-control" 
             style={{ width: 'auto', minWidth: 140, padding: '9px 32px 9px 12px' }}
@@ -217,7 +254,6 @@ export default function EmployeeTable({
             <option value="Terminated">Terminated</option>
           </select>
 
-          {/* Clear Filters Button */}
           {hasActiveFilters && (
             <button 
               className="btn btn-secondary btn-sm"
@@ -229,7 +265,6 @@ export default function EmployeeTable({
           )}
         </div>
 
-        {/* Right Side: Page Size Options */}
         <div className="flex items-center gap-8">
           <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--gray-500)', textTransform: 'uppercase' }}>Rows:</span>
           <select 
@@ -243,7 +278,6 @@ export default function EmployeeTable({
         </div>
       </div>
 
-      {/* Data Table */}
       <div className="table-wrap">
         <table>
           <thead>
@@ -259,7 +293,6 @@ export default function EmployeeTable({
           </thead>
           <tbody>
             {isLoading ? (
-              // Skeleton Loading Rows
               Array.from({ length: pagination.pageSize }).map((_, i) => (
                 <tr key={`skeleton-${i}`}>
                   <td>
@@ -273,13 +306,12 @@ export default function EmployeeTable({
                   </td>
                   <td><Skeleton height={14} width="100px" /></td>
                   <td><Skeleton height={14} width="140px" /></td>
-                  <td><Skeleton height={14} width="80px" /></td>
+                  <td><Skeleton height={24} width="100px" style={{ borderRadius: 6 }} /></td>
                   <td><Skeleton height={20} width="60px" style={{ borderRadius: 10 }} /></td>
                   <td><Skeleton height={28} width="80px" style={{ borderRadius: 6 }} /></td>
                 </tr>
               ))
             ) : table.getRowModel().rows.length === 0 ? (
-              // Empty State
               <tr>
                 <td colSpan={columns.length} style={{ padding: '48px 20px' }}>
                   <EmptyState 
@@ -300,7 +332,6 @@ export default function EmployeeTable({
                 </td>
               </tr>
             ) : (
-              // Data Rows
               table.getRowModel().rows.map(row => (
                 <tr key={row.id}>
                   {row.getVisibleCells().map(cell => (
@@ -315,7 +346,6 @@ export default function EmployeeTable({
         </table>
       </div>
 
-      {/* Pagination Footer */}
       <div className="card-header flex items-center justify-between" style={{ borderTop: '1px solid var(--gray-100)', borderBottom: 'none' }}>
         <span style={{ fontSize: 13, color: 'var(--gray-500)' }}>
           Showing <strong style={{ color: 'var(--gray-900)' }}>{firstRow}</strong> to <strong style={{ color: 'var(--gray-900)' }}>{lastRow}</strong> of <strong style={{ color: 'var(--gray-900)' }}>{totalRecords}</strong> entries
