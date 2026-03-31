@@ -9,7 +9,6 @@ import useDebounce from '../../hooks/useDebounce';
 export default function EmployeeList() {
   // ─── Data State ─────────────────────────────────────────────────────────────
   const [employees, setEmployees] = useState([]);
-  const [departments, setDepartments] = useState([]);
   const [designations, setDesignations] = useState([]);
   
   const [isLoading, setIsLoading] = useState(true);
