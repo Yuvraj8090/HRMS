@@ -22,7 +22,8 @@ export default function EmployeeTable({
   setFilters,
   departments,
   designations,
-  onEdit 
+  onEdit,
+  onDeactivate // This prop name is fine, it now acts as a generic "Toggle" handler passed from parent
 }) {
   
   const columns = useMemo(() => [
@@ -75,23 +76,65 @@ export default function EmployeeTable({
     {
       header: 'Status',
       accessorKey: 'status',
-      cell: ({ getValue }) => <Badge label={getValue() || 'Active'} />
+      cell: ({ getValue }) => {
+        const status = getValue() || 'Active';
+        return <Badge label={status} />;
+      }
     },
     {
       header: 'Actions',
       id: 'actions',
-      cell: ({ row }) => (
-        <button 
-          onClick={() => onEdit(row.original)} 
-          className="btn btn-secondary btn-sm"
-          title="Edit Employee"
-          style={{ padding: '6px 10px' }}
-        >
-          <Icon name="edit" size={16} />
-        </button>
-      )
+      cell: ({ row }) => {
+        const emp = row.original;
+        // Determine if currently active based on User flag or Profile status
+        // Adjust this logic if your backend relies purely on emp.status === 'Active'
+        const isActive = emp.status !== 'Terminated' && emp.status !== 'Resigned'; 
+
+        return (
+          <div className="flex items-center gap-8">
+            <button 
+              onClick={() => onEdit(emp)} 
+              className="btn btn-secondary btn-sm"
+              title="Edit Employee"
+              style={{ padding: '6px 10px' }}
+            >
+              <Icon name="edit" size={16} />
+            </button>
+
+            {isActive ? (
+              // DEACTIVATE BUTTON (Red)
+              <button 
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to DEACTIVATE ${emp.user?.firstName || 'this employee'}?`)) {
+                    onDeactivate(emp);
+                  }
+                }} 
+                className="btn btn-secondary btn-sm"
+                title="Deactivate Employee"
+                style={{ padding: '6px 10px', color: 'var(--red-600)', borderColor: 'var(--red-200)' }}
+              >
+                <Icon name="trash" size={16} />
+              </button>
+            ) : (
+              // ACTIVATE BUTTON (Green)
+              <button 
+                onClick={() => {
+                  if (window.confirm(`Are you sure you want to RE-ACTIVATE ${emp.user?.firstName || 'this employee'}?`)) {
+                    onDeactivate(emp);
+                  }
+                }} 
+                className="btn btn-secondary btn-sm"
+                title="Activate Employee"
+                style={{ padding: '6px 10px', color: 'var(--green-600)', borderColor: 'var(--green-200)' }}
+              >
+                <Icon name="check-circle" size={16} /> 
+              </button>
+            )}
+          </div>
+        );
+      }
     }
-  ], [onEdit]);
+  ], [onEdit, onDeactivate]);
 
   const table = useReactTable({
     data,
@@ -232,7 +275,7 @@ export default function EmployeeTable({
                   <td><Skeleton height={14} width="140px" /></td>
                   <td><Skeleton height={14} width="80px" /></td>
                   <td><Skeleton height={20} width="60px" style={{ borderRadius: 10 }} /></td>
-                  <td><Skeleton height={28} width="36px" style={{ borderRadius: 6 }} /></td>
+                  <td><Skeleton height={28} width="80px" style={{ borderRadius: 6 }} /></td>
                 </tr>
               ))
             ) : table.getRowModel().rows.length === 0 ? (

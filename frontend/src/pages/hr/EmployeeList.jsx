@@ -137,6 +137,23 @@ export default function EmployeeList() {
     }
   };
 
+  // -- UPDATED: Toggle Status Handler --
+  const handleToggleStatus = useCallback(async (employeeInfo) => {
+    try {
+      setIsLoading(true);
+      const targetId = employeeInfo.user?._id || employeeInfo._id;
+      
+      // Call the newly updated API method
+      await employeeAPI.toggleStatus(targetId);
+      
+      toast.success('Employee status updated successfully.');
+      loadDirectory(); 
+    } catch (err) {
+      toast.error(err.message || 'Failed to update employee status.');
+      setIsLoading(false); 
+    }
+  }, [loadDirectory, toast]);
+
   // -- Handlers: Import Modal --
   const handleImportSubmit = async (e) => {
     e.preventDefault();
@@ -195,6 +212,7 @@ export default function EmployeeList() {
         departments={departments}
         designations={designations}
         onEdit={handleEditClick}
+        onDeactivate={handleToggleStatus} // Passed the updated handler here
       />
 
       {/* Modals */}

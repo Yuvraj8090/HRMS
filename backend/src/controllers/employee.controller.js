@@ -7,6 +7,7 @@ import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 import { parseExcelToJSON } from '../utils/excelParser.js';
 
+// ── Bulk Employee Import (Excel) ─────────────────────────────────────────────
 export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
   if (!req.file) return next(new AppError('No file uploaded', 400));
 
@@ -33,10 +34,9 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
         const desigName = String(row['Designation'] || 'Staff').trim();
         const salaryRaw = row['Present Salary'];
 
-        // --- 1. Robust Department Logic (Fixes the "PIU-" Error) ---
-        // We generate a code based on the full name to ensure uniqueness
+        // --- 1. Robust Department Logic ---
         const generatedCode = deptName
-          .replace(/[^a-zA-Z0-9]/g, '') // Remove dashes and spaces
+          .replace(/[^a-zA-Z0-9]/g, '')
           .substring(0, 6)
           .toUpperCase();
 
@@ -53,14 +53,13 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
           { upsert: true, new: true, lean: true }
         );
 
-        // --- 3. UPSERT User (Update if exists, Create if new) ---
+        // --- 3. UPSERT User ---
         const userData = {
           firstName: name.split(' ')[0],
           lastName: name.split(' ').slice(1).join(' ') || 'Employee',
           role: 'Employee'
         };
 
-        // If it's a new user, we set a default password
         const user = await User.findOneAndUpdate(
           { email },
           { $set: userData, $setOnInsert: { password: 'ChangeMe@123' } },
@@ -122,6 +121,7 @@ export const importAllEmployeesExcel = asyncHandler(async (req, res, next) => {
     log: importLog
   });
 });
+
 // ── GET all employees ────────────────────────────────────────────────────────
 export const getAllEmployees = asyncHandler(async (req, res) => {
   const { search, department, status, page = 1, limit = 20 } = req.query;
@@ -142,7 +142,7 @@ export const getAllEmployees = asyncHandler(async (req, res) => {
 
   const total = await EmployeeProfile.countDocuments(profileFilter);
   const profiles = await EmployeeProfile.find(profileFilter)
-    .populate('user', 'firstName lastName email role lastLogin')
+    .populate('user', 'firstName lastName email role lastLogin isActive') // <-- Added isActive to population
     .populate('department', 'name code')
     .populate('designation', 'title level')
     .sort({ createdAt: -1 })
@@ -219,15 +219,47 @@ export const updateEmployee = asyncHandler(async (req, res, next) => {
   }
 });
 
-// ── Deactivate Employee ──────────────────────────────────────────────────────
-export const deactivateEmployee = asyncHandler(async (req, res, next) => {
+// ── Toggle Status (Activate / Deactivate Employee) ───────────────────────────
+export const toggleEmployeeStatus = asyncHandler(async (req, res, next) => {
   const session = await mongoose.startSession();
   session.startTransaction();
   try {
-    await User.findByIdAndUpdate(req.params.id, { isActive: false }, { session });
-    await EmployeeProfile.findOneAndUpdate({ user: req.params.id }, { status: 'Terminated' }, { session });
+    // 1. Fetch current user to determine current state
+    const currentUser = await User.findById(req.params.id).session(session);
+    
+    if (!currentUser) {
+      throw new AppError('User not found', 404);
+    }
+
+    // 2. Determine new state (Toggle logic)
+    // If undefined or true, treat as currently active.
+    const isCurrentlyActive = currentUser.isActive !== false; 
+    const newActiveState = !isCurrentlyActive;
+    const newProfileStatus = newActiveState ? 'Active' : 'Terminated';
+
+    // 3. Apply updates to both collections safely
+    await User.findByIdAndUpdate(
+      req.params.id, 
+      { isActive: newActiveState }, 
+      { session }
+    );
+    
+    await EmployeeProfile.findOneAndUpdate(
+      { user: req.params.id }, 
+      { status: newProfileStatus }, 
+      { session }
+    );
+
     await session.commitTransaction();
-    res.status(200).json({ success: true, message: 'Deactivated.' });
+    
+    res.status(200).json({ 
+      success: true, 
+      message: newActiveState ? 'Employee successfully activated.' : 'Employee successfully deactivated.',
+      data: {
+        isActive: newActiveState,
+        status: newProfileStatus
+      }
+    });
   } catch (error) {
     await session.abortTransaction();
     throw error;
@@ -235,3 +267,6 @@ export const deactivateEmployee = asyncHandler(async (req, res, next) => {
     session.endSession();
   }
 });
+
+// Exporting with the old name so your existing router doesn't break
+export const deactivateEmployee = toggleEmployeeStatus;

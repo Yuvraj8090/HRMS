@@ -45,13 +45,16 @@ export const authAPI = {
 };
 
 export const employeeAPI = {
-  getAll:     (params)    => api.get('/employees', { params }),
-  getOne:     (id)        => api.get(`/employees/${id}`),
-  create:     (data)      => api.post('/employees', data),
-  update:     (id, data)  => api.put(`/employees/${id}`, data),
-  deactivate: (id)        => api.delete(`/employees/${id}`),
-  // ── NEW: Bulk Employee Import ──
-  importAll:  (formData) => api.post('/employees/import-all', formData, {
+  getAll:       (params)   => api.get('/employees', { params }),
+  getOne:       (id)       => api.get(`/employees/${id}`),
+  create:       (data)     => api.post('/employees', data),
+  update:       (id, data) => api.put(`/employees/${id}`, data),
+  
+  // ── UPDATED: Now acts as a toggle (Activate/Deactivate) ──
+  toggleStatus: (id)       => api.delete(`/employees/${id}`),
+  
+  // ── Bulk Employee Import ──
+  importAll:    (formData) => api.post('/employees/import-all', formData, {
     headers: { 'Content-Type': 'multipart/form-data' }
   }),
 };
