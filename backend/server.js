@@ -119,7 +119,7 @@ app.use((err, _req, res, _next) => {
 });
 
 // ── Boot ───────────────────────────────────────────────────────────────────────
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT;
 app.listen(PORT, () => {
   console.log(`\n🚀 HRMS Server running in ${process.env.NODE_ENV || 'development'} mode on port ${PORT}`);
 });
