@@ -2,7 +2,6 @@ import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Icon, Avatar } from '../common/index.jsx';
 
-// ── Navigation Configuration (Domain-Driven Sections) ─────────────────────────
 const NAV = {
   Admin: [
     { section: 'Overview', items: [
@@ -12,7 +11,7 @@ const NAV = {
       { id: 'employees',    label: 'Employees',    icon: 'users' },
       { id: 'projects',     label: 'Projects',     icon: 'briefcase' },
       { id: 'departments',  label: 'Departments',  icon: 'building' },
-      { id: 'designations', label: 'Designations', icon: 'award' }, // <-- NEW: Added Designations
+      { id: 'designations', label: 'Designations', icon: 'award' },
       { id: 'contracts',    label: 'Contracts',    icon: 'layers' },
     ]},
     { section: 'HR Ops', items: [
@@ -34,6 +33,7 @@ const NAV = {
       { id: 'requests',     label: 'Appraisals',   icon: 'trending' },
       { id: 'attendance',   label: 'Attendance',   icon: 'clock' },
       { id: 'leaves',       label: 'Manage Leaves',icon: 'calendar' },
+      { id: 'leaves/apply', label: 'Apply Leave',  icon: 'calendar' },
     ]},
   ],
   Employee: [
@@ -53,27 +53,19 @@ const roleBadgeBg    = { Admin: 'var(--purple-50)',  HR: 'var(--blue-50)',   Emp
 export default function Sidebar() {
   const { user, role, logout } = useAuth();
   
-  // Guard against undefined roles during initial load
   const nav = role && NAV[role] ? NAV[role] : [];
-  
-  // Construct the base path dynamically
   const basePath = role ? `/${role.toLowerCase()}` : '';
 
   return (
     <aside className="sidebar">
-      {/* Brand Header */}
-      {/* Brand Header */}
       <div className="sidebar-brand" style={{ gap: '12px' }}>
         <img 
           src="https://www.u-prepare.com/assets/img/updated-logo.png" 
           alt="U-Prepare Logo" 
           style={{ height: '36px', width: 'auto', objectFit: 'contain' }}
         />
-        {/* Note: If your image already includes the text "U-Prepare", you can delete the <span> below */}
-       
       </div>
 
-      {/* Navigation Links */}
       <nav className="sidebar-nav">
         {nav.map(({ section, items }) => (
           <div key={section} className="nav-section">
@@ -92,10 +84,8 @@ export default function Sidebar() {
         ))}
       </nav>
 
-      {/* User Session Footer */}
       <div className="sidebar-footer">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '8px 10px', marginBottom: 8 }}>
-          {/* Integration: Using our deterministic common Avatar component */}
           <Avatar 
             name={`${user?.firstName || 'User'} ${user?.lastName || ''}`} 
             size={36} 

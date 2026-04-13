@@ -33,38 +33,38 @@ const RequireAuth = () => {
 
   if (loading) return <PageSpinner />;
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
-  
-  return <Outlet />; 
+
+  return <Outlet />;
 };
 
 // 2. Prevents authenticated users from accessing unauthorized roles (Case-Insensitive)
 const RequireRole = ({ allowedRoles }) => {
   const { role, loading } = useAuth();
-  
+
   if (loading) return <PageSpinner />;
-  
+
   const normalizedUserRole = (role || '').toLowerCase();
   const normalizedAllowedRoles = allowedRoles.map(r => r.toLowerCase());
 
   if (!normalizedAllowedRoles.includes(normalizedUserRole)) {
     return <Navigate to="/unauthorized" replace />;
   }
-  
+
   return <Outlet />;
 };
 
 // 3. Smart Redirect for Root Path based on Role (Case-Insensitive)
 const RoleBasedRedirect = () => {
   const { role, loading } = useAuth();
-  
+
   if (loading) return <PageSpinner />;
-  
+
   const normalizedRole = (role || '').toLowerCase();
-  
+
   if (normalizedRole === 'admin') return <Navigate to="/admin/dashboard" replace />;
   if (normalizedRole === 'hr') return <Navigate to="/hr/dashboard" replace />;
   if (normalizedRole === 'employee') return <Navigate to="/employee/dashboard" replace />;
-  
+
   // If the user has a token but an invalid/missing role, they go to unauthorized.
   // This prevents the infinite redirect loop back to /login.
   return <Navigate to="/unauthorized" replace />;
@@ -95,7 +95,7 @@ export default function App() {
             {/* Protected Routes */}
             <Route element={<RequireAuth />}>
               <Route element={<AppLayout />}>
-                
+
                 {/* Auto-routing based on role when hitting "/" */}
                 <Route index element={<RoleBasedRedirect />} />
 
@@ -120,6 +120,10 @@ export default function App() {
                   <Route path="requests" element={<PendingRequests />} />
                   <Route path="projects" element={<ProjectsPage />} />
                   <Route path="leaves" element={<ManageLeaves />} />
+
+                  {/* NEW: Expose the Leave Application component specifically for HRs */}
+                  <Route path="leaves/apply" element={<LeaveApplication />} />
+
                   <Route path="contracts" element={<ContractManagement />} />
                 </Route>
 

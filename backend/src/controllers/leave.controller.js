@@ -3,6 +3,7 @@ import LeaveRequest from '../models/LeaveRequest.model.js';
 import LeaveBalance from '../models/LeaveBalance.model.js';
 import LeaveCategory from '../models/LeaveCategory.model.js';
 import EmployeeProfile from '../models/EmployeeProfile.model.js';
+import User from '../models/User.model.js'; // <-- NEW: Import User model
 import asyncHandler from '../utils/asyncHandler.js';
 import AppError from '../utils/AppError.js';
 
@@ -39,29 +40,40 @@ export const applyForLeave = asyncHandler(async (req, res, next) => {
   res.status(201).json({ success: true, data: newRequest });
 });
 
-// ── 2. Process Leave (HR/Admin) ────────────────────────────────────────────
 export const processLeave = asyncHandler(async (req, res, next) => {
   const { id } = req.params;
-  const { decision, remarks } = req.body; // 'Approved' or 'Rejected'
+  const { decision, remarks } = req.body;
 
   if (!['Approved', 'Rejected'].includes(decision)) {
     return next(new AppError('Decision must be Approved or Rejected.', 400));
   }
 
-  // START ACID TRANSACTION
   const session = await mongoose.startSession();
   session.startTransaction();
 
   try {
-    const leaveRequest = await LeaveRequest.findById(id).populate('leaveCategory').session(session);
+    // We must deeply populate user to check the role for Authorization
+    const leaveRequest = await LeaveRequest.findById(id)
+      .populate('leaveCategory')
+      .populate({
+        path: 'employee',
+        populate: { path: 'user', select: 'role' } 
+      })
+      .session(session);
+
     if (!leaveRequest) throw new AppError('Leave request not found', 404);
     if (leaveRequest.status !== 'Pending') throw new AppError(`Leave request is already ${leaveRequest.status}`, 400);
 
-    // If Approving, strictly deduct balance within the transaction lock
+    // SECURITY ISOLATION: HR cannot process leaves for other HRs or Admins
+    if (req.user.role === 'HR' && leaveRequest.employee.user.role !== 'Employee') {
+      throw new AppError('Unauthorized: HR leaves can only be processed by an Admin.', 403);
+    }
+
+    // ... (Keep the rest of the deduction and save logic exactly the same) ...
     if (decision === 'Approved' && leaveRequest.leaveCategory.code !== 'LWP') {
       const currentYear = getCurrentYear();
       const leaveBalance = await LeaveBalance.findOne({ 
-        employee: leaveRequest.employee, 
+        employee: leaveRequest.employee._id, 
         leaveCategory: leaveRequest.leaveCategory._id,
         year: currentYear
       }).session(session);
@@ -71,13 +83,11 @@ export const processLeave = asyncHandler(async (req, res, next) => {
         throw new AppError(`Insufficient balance. Only ${leaveBalance.currentBalance} days remaining.`, 400);
       }
 
-      // Deduct
       leaveBalance.currentBalance -= leaveRequest.numberOfDays;
       leaveBalance.totalApplied += leaveRequest.numberOfDays;
       await leaveBalance.save({ session });
     }
 
-    // Update Request Status
     leaveRequest.status = decision;
     leaveRequest.remarks = remarks;
     leaveRequest.approvedBy = req.user._id;
@@ -87,13 +97,11 @@ export const processLeave = asyncHandler(async (req, res, next) => {
     }
 
     await leaveRequest.save({ session });
-    
-    // COMMIT TRANSACTION
     await session.commitTransaction();
+    
     res.status(200).json({ success: true, message: `Leave ${decision} successfully.` });
 
   } catch (error) {
-    // ROLLBACK ON ANY FAILURE OR INSUFFICIENT BALANCE
     await session.abortTransaction();
     throw error; 
   } finally {
@@ -101,14 +109,27 @@ export const processLeave = asyncHandler(async (req, res, next) => {
   }
 });
 
-// ── 3. Read Operations (Required for Frontend) ─────────────────────────────
+// ── 3. Read Operations ─────────────────────────────────────────────────────
 
 export const getPendingLeaves = asyncHandler(async (req, res) => {
-  const pending = await LeaveRequest.find({ status: 'Pending' })
+  let matchStage = { status: 'Pending' };
+
+  // SCALABILITY: Database-level filtering for RBAC instead of array.filter()
+  if (req.user.role === 'HR') {
+    // 1. Find all users who are strictly 'Employee'
+    const employeeUsers = await User.find({ role: 'Employee' }).select('_id');
+    // 2. Find their corresponding profiles
+    const employeeProfiles = await EmployeeProfile.find({ user: { $in: employeeUsers } }).select('_id');
+    
+    // 3. Restrict leave requests to only those profiles
+    matchStage.employee = { $in: employeeProfiles };
+  }
+
+  const pending = await LeaveRequest.find(matchStage)
     .populate({
       path: 'employee',
       select: 'employeeId user',
-      populate: { path: 'user', select: 'firstName lastName email' }
+      populate: { path: 'user', select: 'firstName lastName email role' }
     })
     .populate('leaveCategory', 'name code')
     .sort({ createdAt: -1 });
